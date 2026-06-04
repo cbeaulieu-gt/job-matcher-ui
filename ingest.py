@@ -40,7 +40,7 @@ from geopy.distance import geodesic
 from geopy.geocoders import Nominatim
 
 import db
-from job_sources import make_enabled_sources, get_required_search_fields
+from job_sources import make_enabled_sources, get_required_search_fields, get_sources
 from providers import build_provider_chain, LLMProvider
 from credentials import CredentialError, load_providers
 
@@ -1106,6 +1106,41 @@ def _inject_env_var_credentials(providers: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Source-registry mismatch helper
+# ---------------------------------------------------------------------------
+
+
+def _warn_source_mismatch(providers: dict) -> None:
+    """Warn when a source enabled in providers.json has no loaded plugin.
+
+    Compares the ``job_sources`` section of *providers* against the plugin
+    registry returned by :func:`~job_sources.get_sources`.  For every key
+    whose ``enabled`` flag is truthy but whose source key is absent from the
+    loaded registry, a ``WARNING`` is emitted on the ``"ingest"`` logger.
+
+    This is a startup diagnostic — it fires once per run so operators can
+    detect misconfigured or missing plugins before the ingest loop begins.
+    The actual per-source guard also lives inside
+    :func:`~job_sources.make_enabled_sources`; this function provides a
+    second, ingest-level signal that appears in the run banner.
+
+    Args:
+        providers: The providers dict loaded by ``load_providers()``.
+    """
+    loaded_keys: set[str] = set(get_sources().keys())
+    sources_cfg: dict = providers.get("job_sources") or {}
+    for key, src_cfg in sources_cfg.items():
+        if src_cfg.get("enabled") and key not in loaded_keys:
+            logger.warning(
+                "Source %r is enabled in providers.json but its plugin is "
+                "not loaded — check that plugins/sources/%s/ exists and "
+                "plugin.py is valid.",
+                key,
+                key,
+            )
+
+
+# ---------------------------------------------------------------------------
 # Plugin isolation helper
 # ---------------------------------------------------------------------------
 
@@ -1356,6 +1391,8 @@ def run(
 
         from job_sources.auto_register import ensure_plugins_registered
         ensure_plugins_registered(providers_path)
+
+        _warn_source_mismatch(providers)
 
         sources = make_enabled_sources(providers, config)
         if not sources:
