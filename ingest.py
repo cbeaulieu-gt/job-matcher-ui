@@ -26,6 +26,7 @@ import math
 import os
 import re
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -61,6 +62,31 @@ _DEFAULT_PROVIDERS_PATH = os.path.join(_CONFIG_DIR, "providers.json")
 # ---------------------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("ingest")
+
+
+class ImmediateFlushHandler(logging.FileHandler):
+    """A FileHandler that calls flush() after every emitted record.
+
+    The default ``logging.FileHandler`` buffers writes to the underlying
+    stream and only flushes when the buffer fills or the handler is closed.
+    On a long-running ingest pipeline this causes the log file to appear
+    empty — or stale — for minutes at a time, making it impossible to tell
+    whether the process is still making progress.
+
+    ``ImmediateFlushHandler`` overrides :meth:`emit` to flush immediately
+    after each record so that every log line is on disk as soon as it is
+    written.  The performance overhead is negligible for the ingest use case
+    (tens of records per minute at most).
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit *record* and flush the underlying stream immediately.
+
+        Args:
+            record: The log record to write.
+        """
+        super().emit(record)
+        self.flush()
 
 # Set to True by --verbose / -v CLI flag. Used at scoring callsites to emit
 # the full breakdown (verdict, matched/missing skills, concerns) at INFO level.
@@ -120,7 +146,7 @@ def _configure_file_logging() -> None:
     _current_log_file = log_file
 
     try:
-        handler = logging.FileHandler(log_file, encoding="utf-8")
+        handler = ImmediateFlushHandler(log_file, encoding="utf-8")
         handler.setFormatter(
             logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s")
         )
@@ -1170,6 +1196,84 @@ def _safe_pages(client):
 
 
 # ---------------------------------------------------------------------------
+# Heartbeat
+# ---------------------------------------------------------------------------
+
+# How often (in seconds) the heartbeat thread emits a progress log line.
+# Can be overridden at construction time; the module-level constant is the
+# default used by run().
+_HEARTBEAT_INTERVAL_SECONDS = 30
+
+
+class _HeartbeatThread(threading.Thread):
+    """Daemon thread that logs a progress line at a configurable interval.
+
+    Useful for confirming that a long ingest run is still making progress
+    rather than silently hanging.  The heartbeat message includes the
+    number of listings scored so far, the total fetched, and the current
+    pipeline stage.
+
+    The thread is a **daemon** so it is automatically killed when the main
+    process exits, regardless of whether :attr:`stop_event` was set.
+
+    Usage::
+
+        stop = threading.Event()
+        hb = _HeartbeatThread(
+            stop_event=stop,
+            interval_seconds=30,
+            get_counts=lambda: (scored, fetched, stage),
+        )
+        hb.start()
+        # ... run the pipeline ...
+        stop.set()
+        hb.join()
+
+    Attributes:
+        stop_event:       A :class:`threading.Event` that signals the
+                          thread to exit cleanly.
+        interval_seconds: Seconds between heartbeat log lines.
+        get_counts:       Zero-argument callable that returns a 3-tuple
+                          ``(scored: int, fetched: int, stage: str)``.
+    """
+
+    def __init__(
+        self,
+        stop_event: threading.Event,
+        interval_seconds: float,
+        get_counts,  # () -> tuple[int, int, str]
+    ) -> None:
+        """Initialise the heartbeat thread.
+
+        Args:
+            stop_event:       Event that signals the thread to stop.
+            interval_seconds: Seconds between heartbeat emissions.
+            get_counts:       Callable returning ``(scored, fetched, stage)``.
+        """
+        super().__init__(name="ingest-heartbeat", daemon=True)
+        self._stop_event = stop_event
+        self._interval = interval_seconds
+        self._get_counts = get_counts
+
+    def run(self) -> None:
+        """Emit heartbeat lines until *stop_event* is set."""
+        _hb_log = logging.getLogger("ingest")
+        while not self._stop_event.wait(timeout=self._interval):
+            try:
+                scored, fetched, stage = self._get_counts()
+                _hb_log.info(
+                    "Heartbeat — still working: %d/%d listings processed, "
+                    "current stage=%s",
+                    scored,
+                    fetched,
+                    stage,
+                )
+            except Exception:  # noqa: BLE001
+                # Never let an error in get_counts() kill the heartbeat thread.
+                pass
+
+
+# ---------------------------------------------------------------------------
 # Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -1370,6 +1474,24 @@ def run(
             from datetime import timedelta
             hours_cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
+        # --- Heartbeat thread ---
+        # Emits a "still working" progress line every _HEARTBEAT_INTERVAL_SECONDS
+        # so operators can confirm the pipeline is alive during long runs.
+        # The lambda captures the counter variables by reference so the thread
+        # always reads the current values.
+        _current_stage = ["starting"]
+
+        def _heartbeat_counts() -> tuple[int, int, str]:
+            return (scored, fetched, _current_stage[0])
+
+        _heartbeat_stop = threading.Event()
+        _heartbeat = _HeartbeatThread(
+            stop_event=_heartbeat_stop,
+            interval_seconds=_HEARTBEAT_INTERVAL_SECONDS,
+            get_counts=_heartbeat_counts,
+        )
+        _heartbeat.start()
+
         for client in sources:
             logger.info("Fetching from source: %s", client.SOURCE)
             for page in _safe_pages(client):
@@ -1435,6 +1557,7 @@ def run(
                         # API.  If the source also sets description_is_full=True AND the
                         # description is long enough (>= _SCRAPE_MIN_LENGTH), classify
                         # as "full"; otherwise fall back to "snippet".
+                        _current_stage[0] = "scraping"
                         if listing.get("skip_scrape"):
                             scraped_skipped += 1
                             if (listing.get("description_is_full")
@@ -1459,6 +1582,7 @@ def run(
                             listing["description"] = description
 
                         # --- Score ---
+                        _current_stage[0] = "scoring"
                         score_result = score_listing_with_fallback(
                             listing=listing,
                             profile=profile,
@@ -1577,6 +1701,10 @@ def run(
                             src_name,
                             title,
                         )
+
+        # Stop the heartbeat now that the source loop is done.
+        _heartbeat_stop.set()
+        _heartbeat.join(timeout=5.0)
 
         total_tokens = total_tokens_input + total_tokens_output
         run_cost = sum(b["cost"] for b in provider_costs.values())

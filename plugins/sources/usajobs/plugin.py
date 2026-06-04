@@ -200,7 +200,7 @@ class USAJobsClient(JobSource):
 
         return pages
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map a raw USAJobs ``SearchResultItems`` entry to the canonical schema.
 
         Salary fields are only populated when the rate interval is annual
@@ -211,8 +211,9 @@ class USAJobsClient(JobSource):
             raw: A single entry from ``SearchResultItems``.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any USAJobs-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         descriptor: dict = raw.get("MatchedObjectDescriptor") or {}
 

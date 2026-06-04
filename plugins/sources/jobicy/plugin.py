@@ -139,7 +139,7 @@ class JobicyClient(JobSource):
         if results:
             yield results
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map a Jobicy job dict to the canonical listing schema.
 
         Salary is populated from the structured ``annualSalaryMin`` /
@@ -150,8 +150,9 @@ class JobicyClient(JobSource):
             raw: A single entry from the Jobicy ``jobs`` array.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any Jobicy-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         salary_min_raw = raw.get("annualSalaryMin")
         salary_max_raw = raw.get("annualSalaryMax")
@@ -180,7 +181,6 @@ class JobicyClient(JobSource):
             "salary_min": salary_min,
             "salary_max": salary_max,
             "salary_period": salary_period,
-            "contract_type": None,
             "contract_time": _coerce_contract_field(raw.get("jobType")),
             "description": strip_html(raw.get("jobDescription", "") or ""),
             "redirect_url": raw.get("url", "") or "",

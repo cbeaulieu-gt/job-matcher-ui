@@ -41,7 +41,7 @@ class TestJobSourceABC:
         class Incomplete(JobSourceBase):
             def fetch_page(self, page):
                 return []
-            # total_pages and normalise intentionally missing
+            # total_pages and _normalise intentionally missing
 
         with pytest.raises(TypeError):
             Incomplete()  # type: ignore[abstract]
@@ -53,8 +53,15 @@ class TestJobSourceABC:
                 return []
             def total_pages(self):
                 return 1
-            def normalise(self, raw):
-                return {}
+            def _normalise(self, raw):
+                return {
+                    "source": "test",
+                    "source_id": "1",
+                    "title": "",
+                    "company": "",
+                    "location": "",
+                    "redirect_url": "",
+                }
 
         # Should not raise.
         instance = Complete()

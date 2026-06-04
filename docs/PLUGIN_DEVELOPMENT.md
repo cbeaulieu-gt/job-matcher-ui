@@ -28,10 +28,12 @@ required.
 
    - `fetch_page(page)` — fetch one page of raw listings from the source API.
    - `total_pages()` — return the total number of pages available.
-   - `normalise(raw)` — convert one raw listing dict to the canonical schema.
+   - `_normalise(raw)` — convert one raw listing dict to the canonical schema.
 
-   See the [Canonical Listing Schema](#canonical-listing-schema) section for the
-   exact keys `normalise()` must return.
+   See the [Canonical Listing Schema](#canonical-listing-schema) section for
+   the required and optional keys `_normalise()` should return.  The public
+   `normalise()` method is provided by the base class; it calls `_normalise()`
+   and then fills in defaults for any optional keys you omit.
 
 4. **Fill in `source.json`** with metadata about your source:
 
@@ -89,26 +91,40 @@ loader from `source.json` and injected onto the class at load time.
 
 ## Canonical Listing Schema
 
-`normalise()` must return a dict containing **all** of the following keys. Use
-`None` for fields the source does not provide — never omit a key.
+`_normalise()` returns a dict of canonical keys.  The base class
+`normalise()` wrapper applies defaults for any optional keys you omit, so
+you only need to include the keys your source actually has data for.
 
-| Key            | Type          | Description |
-|----------------|---------------|-------------|
-| `source`       | str           | Source identifier; must match `source_key`. |
-| `source_id`    | str           | Unique listing ID from the source. |
-| `title`        | str           | Job title. |
-| `company`      | str           | Employer name. |
-| `location`     | str           | Location string as returned by the source. |
-| `salary_min`   | float or None | Lower salary bound in local currency. |
-| `salary_max`   | float or None | Upper salary bound in local currency. |
-| `salary_period`| str or None   | Pay period: `"annual"`, `"daily"`, `"hourly"`, or `None`. |
-| `contract_type`| str or None   | e.g. `"permanent"`, `"contract"`, or `None`. |
-| `contract_time`| str or None   | e.g. `"full_time"`, `"part_time"`, or `None`. |
-| `description`  | str or None   | Short snippet or `None`. The pipeline scrapes the full job description later unless `skip_scrape` is `True`. |
-| `redirect_url` | str           | URL linking to the full job listing. |
-| `created_at`   | str or None   | ISO 8601 string, e.g. `"2026-01-02T12:34:56Z"`. |
-| `skip_scrape`  | bool          | Optional (default `False`). Set `True` when the source URL is known to block scrapers (e.g. returns 403). The pipeline uses the API description directly. |
-| `description_is_full` | bool   | Optional (default `False`). Set `True` alongside `skip_scrape` when the API provides complete job descriptions (not just snippets). Listings with this flag and descriptions >= 100 chars are classified as `"full"` in the main feed instead of `"snippet"`. |
+### Required keys
+
+Always return these six keys with a meaningful value:
+
+| Key          | Type | Description |
+|--------------|------|-------------|
+| `source`     | str  | Source identifier; must match `source_key`. |
+| `source_id`  | str  | Unique listing ID from the source. |
+| `title`      | str  | Job title. |
+| `company`    | str  | Employer name. |
+| `location`   | str  | Location string as returned by the source. |
+| `redirect_url` | str | URL linking to the full job listing. |
+
+### Optional keys
+
+Include these only when your source has data for them.  Any key you omit is
+automatically defaulted by `_apply_defaults()` before the listing reaches the
+ingestion pipeline — bracket access in `ingest.py` is always safe.
+
+| Key                  | Type          | Default | Description |
+|----------------------|---------------|---------|-------------|
+| `salary_min`         | float or None | `None`  | Lower salary bound in local currency. |
+| `salary_max`         | float or None | `None`  | Upper salary bound in local currency. |
+| `salary_period`      | str or None   | `None`  | Pay period: `"annual"`, `"daily"`, `"hourly"`, or `None`. |
+| `contract_type`      | str or None   | `None`  | e.g. `"permanent"`, `"contract"`, or `None`. |
+| `contract_time`      | str or None   | `None`  | e.g. `"full_time"`, `"part_time"`, or `None`. |
+| `description`        | str or None   | `None`  | Short snippet or `None`. The pipeline scrapes the full job description later unless `skip_scrape` is `True`. |
+| `created_at`         | str or None   | `None`  | ISO 8601 string, e.g. `"2026-01-02T12:34:56Z"`. |
+| `skip_scrape`        | bool          | `False` | Set `True` when the source URL is known to block scrapers (e.g. returns 403). The pipeline uses the API description directly. |
+| `description_is_full`| bool          | `False` | Set `True` alongside `skip_scrape` when the API provides complete job descriptions (not just snippets). Listings with this flag and descriptions >= 100 chars are classified as `"full"` in the main feed instead of `"snippet"`. |
 
 ---
 

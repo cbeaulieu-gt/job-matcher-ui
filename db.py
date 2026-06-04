@@ -25,6 +25,7 @@ immediately rather than at the first database call.
 import json
 import logging
 import os
+import queue
 import threading
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 
@@ -217,6 +218,21 @@ def _lookup_pricing(model_used: str | None) -> tuple[float, float] | None:
 # Connection pool — initialised once at module import.
 # ---------------------------------------------------------------------------
 
+# How long (in seconds) get_connection() waits for a connection from an
+# exhausted pool before raising PoolWaitTimeout.  Callers may override this
+# per-call via the pool_wait_timeout parameter.
+POOL_WAIT_TIMEOUT_SECONDS: float = 30.0
+
+
+class PoolWaitTimeout(Exception):
+    """Raised by get_connection() when the pool is exhausted and the
+    configured wait timeout elapses before a connection becomes available.
+
+    Allows callers to catch a bounded failure instead of hanging indefinitely
+    when all connections in the ThreadedConnectionPool are in use.
+    """
+
+
 _pool: psycopg2.pool.ThreadedConnectionPool | None = None
 _pool_lock = threading.Lock()
 
@@ -291,7 +307,9 @@ class _Conn:
 # Connection factory
 # ---------------------------------------------------------------------------
 
-def get_connection() -> _Conn:
+def get_connection(
+    pool_wait_timeout: float = POOL_WAIT_TIMEOUT_SECONDS,
+) -> _Conn:
     """Check out a connection from the pool and return it wrapped in ``_Conn``.
 
     The connection has ``autocommit=True`` so every statement auto-commits in
@@ -302,9 +320,52 @@ def get_connection() -> _Conn:
 
     The caller is responsible for closing the connection (which returns it to
     the pool), either explicitly or via the ``_Conn`` context manager.
+
+    Args:
+        pool_wait_timeout: Seconds to wait for a connection before raising
+            :class:`PoolWaitTimeout`.  Defaults to
+            :data:`POOL_WAIT_TIMEOUT_SECONDS` (30 s).  Pass a smaller value
+            in tests to keep them snappy.
+
+    Returns:
+        A :class:`_Conn` wrapping the checked-out psycopg2 connection.
+
+    Raises:
+        PoolWaitTimeout: If the pool is exhausted and *pool_wait_timeout*
+            elapses before a connection becomes available.
     """
     pool = _get_pool()
-    raw = pool.getconn()
+
+    # psycopg2's ThreadedConnectionPool.getconn() blocks indefinitely when the
+    # pool is exhausted.  Run it on a daemon thread and use a result queue with
+    # a bounded get() timeout to avoid hanging forever.  The worker thread is a
+    # daemon so it does not prevent process exit if it is still blocked when the
+    # timeout fires (e.g. because every pool slot is genuinely in use).
+    _result_q: queue.Queue = queue.Queue(maxsize=1)
+
+    def _worker() -> None:
+        try:
+            conn = pool.getconn()
+            _result_q.put(("ok", conn))
+        except Exception as _exc:  # noqa: BLE001
+            _result_q.put(("err", _exc))
+
+    _t = threading.Thread(target=_worker, daemon=True)
+    _t.start()
+
+    try:
+        outcome, value = _result_q.get(timeout=pool_wait_timeout)
+    except queue.Empty:
+        raise PoolWaitTimeout(
+            f"Connection pool exhausted: no connection available within "
+            f"{pool_wait_timeout:.1f}s. Increase the pool size (maxconn) "
+            "or reduce concurrent workers."
+        ) from None
+
+    if outcome == "err":
+        raise value  # type: ignore[misc]
+
+    raw = value
     raw.autocommit = True
     return _Conn(raw, pool)
 

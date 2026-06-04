@@ -52,7 +52,7 @@ class _StubSource(JobSource):
         """Return 1 — a single page is always sufficient for these tests."""
         return 1
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Pass through — fixture data is already normalised."""
         return raw
 

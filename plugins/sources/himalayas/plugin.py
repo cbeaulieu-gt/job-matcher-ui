@@ -244,15 +244,16 @@ class HimalayasClient(JobSource):
                 return
             yield results
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map a Himalayas job dict to the canonical listing schema.
 
         Args:
             raw: A single entry from the Himalayas ``jobs`` array.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any Himalayas-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         location_restrictions: list[str] = raw.get("locationRestrictions") or []
         location = ", ".join(location_restrictions) if location_restrictions else "Worldwide"
@@ -268,8 +269,6 @@ class HimalayasClient(JobSource):
             "location": location,
             "salary_min": raw.get("minSalary"),
             "salary_max": raw.get("maxSalary"),
-            "salary_period": None,  # Himalayas API does not expose a pay-period field
-            "contract_type": None,
             "contract_time": _map_job_type(raw.get("employmentType")),
             "description": description,
             "redirect_url": raw.get("applicationLink") or "",

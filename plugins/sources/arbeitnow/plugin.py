@@ -184,7 +184,7 @@ class ArbeitnowClient(JobSource):
                 return
             yield [self.normalise(r) for r in results]
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map an Arbeitnow listing dict to the canonical listing schema.
 
         Field mapping:
@@ -203,8 +203,9 @@ class ArbeitnowClient(JobSource):
             raw: A single entry from the Arbeitnow ``data`` array.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any Arbeitnow-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         # Resolve location: prefer the location string; fall back to "Remote"
         # when the remote flag is set and no location string is provided.
@@ -236,10 +237,6 @@ class ArbeitnowClient(JobSource):
             "title": raw.get("title", "") or "",
             "company": raw.get("company_name", "") or "",
             "location": location,
-            "salary_min": None,
-            "salary_max": None,
-            "salary_period": None,  # Arbeitnow does not expose salary data
-            "contract_type": None,
             "contract_time": contract_time,
             "description": description,
             "redirect_url": raw.get("url", "") or "",

@@ -85,46 +85,43 @@ class TemplateSource(JobSource):
         """
         raise NotImplementedError
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Convert one raw listing dict to the canonical schema.
 
-        Every key listed below must be present in the returned dict.
-        Use None for fields the source does not provide — never omit a key.
+        Implement this method instead of ``normalise()``.  Only include the
+        keys your source has data for — the base class ``normalise()`` wrapper
+        applies defaults for any optional keys you omit.
 
-        Required canonical keys (see job_sources/base.py module docstring):
+        Required keys (must always be present and non-empty):
 
             source          str          — source identifier, must match source_key
             source_id       str          — unique listing ID from the source
             title           str          — job title
             company         str          — employer name
             location        str          — location string as returned by source
+            redirect_url    str          — URL linking to the full job listing
+
+        Optional keys (omit if your source has no data for them; defaults are
+        applied automatically — see ``job_sources/base.py``):
+
             salary_min      float|None   — lower salary bound (in local currency)
             salary_max      float|None   — upper salary bound (in local currency)
             salary_period   str|None     — "annual", "daily", "hourly", or None
             contract_type   str|None     — e.g. "permanent", "contract", or None
             contract_time   str|None     — e.g. "full_time", "part_time", or None
             description     str|None     — snippet or None; pipeline scrapes full JD later
-            redirect_url    str          — URL linking to the full job listing
             created_at      str|None     — ISO 8601 string, e.g. "2026-01-02T12:34:56Z"
-
-        Optional canonical keys:
-
-            skip_scrape     bool         — set True when the source URL is known to
-                                           block scrapers (returns 403, requires login,
-                                           etc.). The pipeline will use the API
-                                           description directly instead of scraping.
+            skip_scrape     bool         — True when source URL blocks scrapers
             description_is_full
-                            bool         — set True alongside skip_scrape when the
-                                           source API provides complete job
-                                           descriptions (not just snippets).
-                                           Listings with this flag and descriptions
-                                           >= 100 chars are classified as "full".
+                            bool         — True when source provides complete descriptions
 
         Args:
             raw: A single listing dict as returned by ``fetch_page()``.
 
         Returns:
-            Dict conforming to the canonical listing schema above.
+            Dict with required keys plus any optional keys the source populates.
+            Do not include optional keys your source has no data for — the base
+            class will default them automatically.
 
         Example::
 
@@ -137,13 +134,12 @@ class TemplateSource(JobSource):
                 "title": raw.get("title", ""),
                 "company": raw.get("company", ""),
                 "location": raw.get("location", ""),
+                "redirect_url": raw.get("url", ""),
+                # Include optional keys only when the source has data for them:
                 "salary_min": salary_min,
                 "salary_max": salary_max,
-                "salary_period": None,
-                "contract_type": raw.get("type"),
                 "contract_time": raw.get("schedule"),
                 "description": strip_html(raw.get("description", "")),
-                "redirect_url": raw.get("url", ""),
                 "created_at": raw.get("posted_at"),
             }
         """

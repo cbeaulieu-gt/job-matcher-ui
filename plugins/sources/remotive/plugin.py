@@ -113,15 +113,16 @@ class RemotiveClient(JobSource):
         if results:
             yield results
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map a Remotive job dict to the canonical listing schema.
 
         Args:
             raw: A single entry from the Remotive ``jobs`` array.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any Remotive-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         salary_min, salary_max = parse_salary(raw.get("salary") or "")
 
@@ -133,8 +134,6 @@ class RemotiveClient(JobSource):
             "location": raw.get("candidate_required_location", "") or "",
             "salary_min": salary_min,
             "salary_max": salary_max,
-            "salary_period": None,  # Remotive salary is free-text; period cannot be reliably inferred
-            "contract_type": None,
             "contract_time": raw.get("job_type", "") or "",
             "description": strip_html(raw.get("description", "") or ""),
             "redirect_url": raw.get("url", "") or "",

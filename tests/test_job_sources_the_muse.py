@@ -138,15 +138,33 @@ class TestTheMuseClientNormalise:
         assert result["created_at"] == "2026-01-15T09:00:00Z"
 
     def test_all_canonical_keys_present(self):
-        """normalise() output contains every key in the canonical schema."""
-        expected_keys = {
+        """normalise() output contains all required and optional canonical keys.
+
+        Required keys must be present (source populates them directly).
+        Optional keys are present because the base-class ``_apply_defaults()``
+        fills them in when ``_normalise()`` omits them.
+        """
+        required_keys = {
             "source", "source_id", "title", "company", "location",
-            "salary_min", "salary_max", "salary_period", "contract_type", "contract_time",
-            "description", "redirect_url", "created_at",
+            "redirect_url",
+        }
+        optional_keys = {
+            "salary_min", "salary_max", "salary_period", "contract_type",
+            "contract_time", "description", "created_at",
+            "skip_scrape", "description_is_full",
         }
         client = _make_client()
         result = client.normalise(_RAW_LISTING)
-        assert expected_keys == set(result.keys())
+        assert required_keys.issubset(result.keys())
+        # Optional keys that The Muse does not populate are defaulted by base.
+        assert optional_keys.issubset(result.keys())
+        # Defaulted optional keys the source has no data for are None/False.
+        assert result["salary_min"] is None
+        assert result["salary_max"] is None
+        assert result["salary_period"] is None
+        assert result["contract_type"] is None
+        assert result["skip_scrape"] is False
+        assert result["description_is_full"] is False
 
 
 # ---------------------------------------------------------------------------
