@@ -69,7 +69,7 @@ class _KeylessSource(JobSource):
     def total_pages(self):
         return 1
 
-    def normalise(self, raw):
+    def _normalise(self, raw):
         return {}
 
     @classmethod
@@ -90,7 +90,7 @@ class _KeyedSource(JobSource):
     def total_pages(self):
         return 1
 
-    def normalise(self, raw):
+    def _normalise(self, raw):
         return {}
 
     @classmethod
@@ -279,7 +279,7 @@ class _FailingSource(JobSource):
     def total_pages(self):
         return 1
 
-    def normalise(self, raw):
+    def _normalise(self, raw):
         return {}
 
     @classmethod

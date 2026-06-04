@@ -122,7 +122,7 @@ class MockJobSource(JobSource):
     def total_pages(self) -> int:
         return 1
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Pass-through — the fixture data is already normalised."""
         return raw
 

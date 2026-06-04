@@ -211,7 +211,7 @@ class TestAbcDefaultPages:
             def total_pages(self):
                 return 2
 
-            def normalise(self, raw):
+            def _normalise(self, raw):
                 return raw
 
             @classmethod

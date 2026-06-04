@@ -238,7 +238,7 @@ class _SearchRequiringSource(BaseJobSource):
     def total_pages(self) -> int:
         return 0
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         return {}
 
     def pages(self) -> Iterator[list[dict]]:
@@ -580,7 +580,7 @@ class TestMakeEnabledSourcesKeyErrorCaught:
             def total_pages(self):
                 return 0
 
-            def normalise(self, raw):
+            def _normalise(self, raw):
                 return {}
 
             def pages(self) -> Iterator[list[dict]]:

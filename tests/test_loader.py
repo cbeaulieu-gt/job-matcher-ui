@@ -37,7 +37,7 @@ class TestSource(JobSource):
         return []
     def total_pages(self):
         return 1
-    def normalise(self, raw):
+    def _normalise(self, raw):
         return {}
     @classmethod
     def settings_schema(cls):
@@ -106,7 +106,7 @@ def _make_plugin(
 class TestSource{i}(JobSource):
     def fetch_page(self, page): return []
     def total_pages(self): return 1
-    def normalise(self, raw): return {{}}
+    def _normalise(self, raw): return {{}}
     @classmethod
     def settings_schema(cls): return {{"display_name": "T{i}", "fields": []}}
 """)

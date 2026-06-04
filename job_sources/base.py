@@ -2,36 +2,71 @@
 job_sources/base.py — Abstract base class for job source providers.
 
 All concrete job sources must implement ``fetch_page()``, ``total_pages()``,
-and ``normalise()`` so that the ingestion pipeline can work with any source
+and ``_normalise()`` so that the ingestion pipeline can work with any source
 without source-specific branching.
 
 Canonical listing schema
 ------------------------
-``normalise()`` must return a dict with exactly these keys:
+``normalise()`` (the public method on this base class) calls ``_normalise()``
+then applies schema defaults so that every key in the canonical schema is
+always present in the returned dict.  Plugins only need to return the keys
+they have data for.
+
+Required keys — must always be present with a meaningful value:
 
     source          str          — source identifier, e.g. "adzuna"
     source_id       str          — source-specific listing ID
     title           str
     company         str
     location        str
-    salary_min      float|None
-    salary_max      float|None
-    salary_period   str|None     — pay period: "annual", "daily", "hourly", or None (unknown)
-    contract_type   str|None
-    contract_time   str|None
-    description     str|None     — snippet or None; full JD scraped later
     redirect_url    str
+
+Optional keys — populated by plugins that have data for them; absent keys are
+defaulted automatically by ``_apply_defaults()`` before the dict reaches the
+ingestion pipeline:
+
+    salary_min      float|None   — default None
+    salary_max      float|None   — default None
+    salary_period   str|None     — "annual", "daily", "hourly", or None
+                                   default None
+    contract_type   str|None     — default None
+    contract_time   str|None     — default None
+    description     str|None     — snippet or None; full JD scraped later
+                                   default None
     created_at      str|None     — ISO 8601 string, e.g. "2026-01-02T12:34:56Z"
-    skip_scrape     bool         — optional (default False); set True when the source
-                                   URL is known to block scrapers (e.g. Jooble /jdp/
-                                   pages return 403). The pipeline skips the HTTP
-                                   scrape step and uses the API description directly.
+                                   default None
+    skip_scrape     bool         — set True when the source URL is known to
+                                   block scrapers (e.g. Jooble /jdp/ pages
+                                   return 403).  The pipeline skips the HTTP
+                                   scrape step and uses the API description
+                                   directly.  Default False.
+    description_is_full
+                    bool         — set True alongside skip_scrape when the
+                                   source API provides complete job descriptions
+                                   (not just snippets).  Listings with this
+                                   flag and descriptions >= 100 chars are
+                                   classified as "full" in the main feed.
+                                   Default False.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Iterator
+
+# Optional keys and their defaults, applied by ``_apply_defaults()`` whenever
+# a plugin's ``_normalise()`` does not explicitly set them.
+_OPTIONAL_DEFAULTS: dict = {
+    "salary_min": None,
+    "salary_max": None,
+    "salary_period": None,
+    "contract_type": None,
+    "contract_time": None,
+    "description": None,
+    "created_at": None,
+    "skip_scrape": False,
+    "description_is_full": False,
+}
 
 
 class JobSource(ABC):
@@ -76,18 +111,64 @@ class JobSource(ABC):
         ...
 
     @abstractmethod
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Convert a source-specific raw listing dict to the canonical schema.
+
+        Plugins implement this method instead of ``normalise()``.  Only the
+        keys the source actually has data for need to be returned — the public
+        ``normalise()`` method fills in optional-key defaults via
+        ``_apply_defaults()`` before returning to callers.
 
         Args:
             raw: A single raw listing dict as returned by ``fetch_page()``.
 
         Returns:
-            Dict conforming to the canonical listing schema documented in
-            this module's docstring.  All keys must be present; unknown
-            source fields are silently dropped.
+            Dict containing at minimum all required canonical keys plus any
+            optional keys the source populates.  Unknown source fields are
+            silently dropped.
         """
         ...
+
+    # ------------------------------------------------------------------
+    # Concrete helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _apply_defaults(listing: dict) -> dict:
+        """Fill in optional canonical keys that the plugin did not set.
+
+        Applies ``_OPTIONAL_DEFAULTS`` for every key absent from *listing*
+        without overwriting keys the plugin explicitly set (including falsy
+        values like ``None``, ``0``, or ``""``, which are intentional).
+
+        Args:
+            listing: Partial canonical listing dict from ``_normalise()``.
+
+        Returns:
+            The same dict with missing optional keys populated from
+            ``_OPTIONAL_DEFAULTS``.
+        """
+        for key, default in _OPTIONAL_DEFAULTS.items():
+            if key not in listing:
+                listing[key] = default
+        return listing
+
+    def normalise(self, raw: dict) -> dict:
+        """Convert a raw listing dict to the canonical schema with defaults.
+
+        Calls ``_normalise(raw)`` then applies optional-key defaults so that
+        every key in the canonical schema is always present.  Callers should
+        use this method; plugins should implement ``_normalise()``.
+
+        Args:
+            raw: A single raw listing dict as returned by ``fetch_page()``.
+
+        Returns:
+            Dict conforming to the canonical listing schema with all optional
+            keys present (defaulted if not set by the plugin).
+        """
+        listing = self._normalise(raw)
+        return self._apply_defaults(listing)
 
     def pages(self) -> Iterator[list[dict]]:
         """Yield normalised listing lists, one per page.
