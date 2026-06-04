@@ -27,7 +27,7 @@ def reset_root_logger():
 def test_no_raise_on_permission_error(tmp_path, monkeypatch):
     """Function must not raise when FileHandler raises PermissionError."""
     monkeypatch.setenv("LOG_DIR", str(tmp_path))
-    with patch("logging.FileHandler", side_effect=PermissionError("Permission denied")):
+    with patch("ingest.ImmediateFlushHandler", side_effect=PermissionError("Permission denied")):
         # Should complete silently — no exception propagated.
         _configure_file_logging()
 
@@ -35,7 +35,7 @@ def test_no_raise_on_permission_error(tmp_path, monkeypatch):
 def test_warning_logged_on_permission_error(tmp_path, monkeypatch, caplog):
     """A WARNING containing 'File logging unavailable' must be emitted."""
     monkeypatch.setenv("LOG_DIR", str(tmp_path))
-    with patch("logging.FileHandler", side_effect=PermissionError("Permission denied")):
+    with patch("ingest.ImmediateFlushHandler", side_effect=PermissionError("Permission denied")):
         with caplog.at_level(logging.WARNING):
             _configure_file_logging()
 
@@ -52,7 +52,7 @@ def test_no_file_handler_added_on_permission_error(tmp_path, monkeypatch):
     root_logger = logging.getLogger()
     handlers_before = list(root_logger.handlers)
 
-    with patch("logging.FileHandler", side_effect=PermissionError("Permission denied")):
+    with patch("ingest.ImmediateFlushHandler", side_effect=PermissionError("Permission denied")):
         _configure_file_logging()
 
     file_handlers_after = [
@@ -67,7 +67,7 @@ def test_no_file_handler_added_on_permission_error(tmp_path, monkeypatch):
 def test_no_raise_on_oserror(tmp_path, monkeypatch):
     """Function must not raise when FileHandler raises OSError."""
     monkeypatch.setenv("LOG_DIR", str(tmp_path))
-    with patch("logging.FileHandler", side_effect=OSError("Read-only file system")):
+    with patch("ingest.ImmediateFlushHandler", side_effect=OSError("Read-only file system")):
         _configure_file_logging()
 
 
