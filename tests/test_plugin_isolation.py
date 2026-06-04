@@ -39,7 +39,7 @@ class _GoodSource(JobSource):
     def total_pages(self) -> int:
         return 2
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         return raw
 
     @classmethod
@@ -62,7 +62,7 @@ class _CrashingSource(JobSource):
     def total_pages(self) -> int:
         return 1
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         return raw
 
     @classmethod
@@ -85,7 +85,7 @@ class _CrashMidwaySource(JobSource):
     def total_pages(self) -> int:
         return 1
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         return raw
 
     @classmethod

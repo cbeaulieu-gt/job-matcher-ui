@@ -449,15 +449,29 @@ class TestUSAJobsClientNormalise:
         assert result["created_at"] == ""
 
     def test_normalise_returns_all_canonical_keys(self):
-        """normalise() always returns exactly the canonical schema keys."""
-        canonical_keys = {
+        """normalise() output contains all required and optional canonical keys.
+
+        Required keys must be present (source populates them directly).
+        Optional keys are present because the base-class ``_apply_defaults()``
+        fills them in when ``_normalise()`` omits them.
+        """
+        required_keys = {
             "source", "source_id", "title", "company", "location",
-            "salary_min", "salary_max", "salary_period", "contract_type", "contract_time",
-            "description", "redirect_url", "created_at",
+            "redirect_url",
+        }
+        optional_keys = {
+            "salary_min", "salary_max", "salary_period", "contract_type",
+            "contract_time", "description", "created_at",
+            "skip_scrape", "description_is_full",
         }
         client = self._client()
         result = client.normalise(_RAW_ITEM)
-        assert set(result.keys()) == canonical_keys
+        assert required_keys.issubset(result.keys())
+        # Optional keys are present (either populated by source or defaulted).
+        assert optional_keys.issubset(result.keys())
+        # Defaulted optional keys USAJobs has no data for are False.
+        assert result["skip_scrape"] is False
+        assert result["description_is_full"] is False
 
 
 # ---------------------------------------------------------------------------

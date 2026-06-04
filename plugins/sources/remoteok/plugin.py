@@ -143,7 +143,7 @@ class RemoteOKClient(JobSource):
         if results:
             yield results
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map a RemoteOK raw listing dict to the canonical listing schema.
 
         Salary fields set to ``0`` by RemoteOK (meaning "not specified") are
@@ -154,8 +154,9 @@ class RemoteOKClient(JobSource):
             raw: A single job dict from the RemoteOK API response.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any RemoteOK-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         # Salary: 0 or absent → None.
         raw_salary_min = raw.get("salary_min")
@@ -187,9 +188,6 @@ class RemoteOKClient(JobSource):
             "location": location,
             "salary_min": salary_min,
             "salary_max": salary_max,
-            "salary_period": None,  # RemoteOK does not expose a pay-period field
-            "contract_type": None,
-            "contract_time": None,
             "description": description,
             "redirect_url": raw.get("url", "") or "",
             "created_at": raw.get("date", "") or "",

@@ -184,19 +184,20 @@ class TheMuseClient(JobSource):
         self._page_count = int(data.get("page_count", 0))
         return self._page_count
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map a raw The Muse listing dict to the canonical listing schema.
 
-        The Muse does not expose salary information, so ``salary_min``,
-        ``salary_max``, and ``contract_type`` are always ``None``.  HTML
-        markup in the ``contents`` field is stripped to plain text.
+        The Muse does not expose salary information or contract type, so those
+        optional keys are omitted and defaulted by the base class wrapper.
+        HTML markup in the ``contents`` field is stripped to plain text.
 
         Args:
             raw: A single entry from The Muse ``results`` array.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any The Muse-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         # Nested objects — guard against None / missing keys.
         company: str = (raw.get("company") or {}).get("name") or ""
@@ -209,10 +210,6 @@ class TheMuseClient(JobSource):
             "title": raw.get("name") or "",
             "company": company,
             "location": location,
-            "salary_min": None,
-            "salary_max": None,
-            "salary_period": None,  # The Muse does not expose salary data
-            "contract_type": None,
             "contract_time": raw.get("type") or None,
             "description": self._strip_html(raw.get("contents")),
             "redirect_url": (raw.get("refs") or {}).get("landing_page") or "",

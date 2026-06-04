@@ -183,15 +183,16 @@ class AdzunaClient(JobSource):
         """
         return self._search["max_pages"]
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map an Adzuna result dict to the canonical listing schema.
 
         Args:
             raw: A single entry from the Adzuna ``results`` array.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any Adzuna-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         company_obj = raw.get("company") or {}
         location_obj = raw.get("location") or {}

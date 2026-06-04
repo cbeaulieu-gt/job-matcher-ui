@@ -384,7 +384,7 @@ class JSearchClient(JobSource):
         """
         return self._search["max_pages"]
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map a JSearch listing dict to the canonical listing schema.
 
         Location is assembled from structured city/state/country fields when
@@ -397,8 +397,9 @@ class JSearchClient(JobSource):
             raw: A single entry from the JSearch ``data`` array.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any JSearch-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         # Assemble location from structured parts; fall back to job_location.
         location_parts = [
@@ -423,7 +424,6 @@ class JSearchClient(JobSource):
             "salary_min": raw.get("job_min_salary"),
             "salary_max": raw.get("job_max_salary"),
             "salary_period": _normalise_salary_period(raw.get("job_salary_period")),
-            "contract_type": None,  # JSearch does not expose permanent/contract distinction
             "contract_time": _normalise_contract_time(raw.get("job_employment_type")),
             "description": raw.get("job_description", "") or "",
             "redirect_url": redirect_url,

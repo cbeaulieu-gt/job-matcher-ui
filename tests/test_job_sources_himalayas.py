@@ -376,15 +376,31 @@ class TestHimalayasClientNormalise:
         assert result["description"] == ""
 
     def test_normalise_canonical_keys_present(self):
-        """normalise() output must contain all canonical schema keys."""
-        expected_keys = {
+        """normalise() output contains all required and optional canonical keys.
+
+        Required keys must be present (source populates them directly).
+        Optional keys are present because the base-class ``_apply_defaults()``
+        fills them in when ``_normalise()`` omits them.
+        """
+        required_keys = {
             "source", "source_id", "title", "company", "location",
-            "salary_min", "salary_max", "salary_period", "contract_type", "contract_time",
-            "description", "redirect_url", "created_at",
+            "redirect_url",
+        }
+        optional_keys = {
+            "salary_min", "salary_max", "salary_period", "contract_type",
+            "contract_time", "description", "created_at",
+            "skip_scrape", "description_is_full",
         }
         client = self._client()
         result = client.normalise(_RAW_JOB)
-        assert set(result.keys()) == expected_keys
+        assert required_keys.issubset(result.keys())
+        # Optional keys are present (either populated by source or defaulted).
+        assert optional_keys.issubset(result.keys())
+        # Defaulted optional keys Himalayas has no data for are None/False.
+        assert result["salary_period"] is None
+        assert result["contract_type"] is None
+        assert result["skip_scrape"] is False
+        assert result["description_is_full"] is False
 
     def test_normalise_salary_period_is_none(self):
         """salary_period is always None — Himalayas API does not expose pay period."""

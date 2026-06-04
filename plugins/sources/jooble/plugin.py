@@ -221,7 +221,7 @@ class JoobleClient(JobSource):
                 return
             yield results
 
-    def normalise(self, raw: dict) -> dict:
+    def _normalise(self, raw: dict) -> dict:
         """Map a Jooble listing dict to the canonical listing schema.
 
         HTML is stripped from the ``snippet`` field.  Salary is parsed
@@ -240,8 +240,9 @@ class JoobleClient(JobSource):
             raw: A single entry from the Jooble ``jobs`` array.
 
         Returns:
-            Dict conforming to the canonical listing schema defined in
-            ``job_sources.base``.
+            Dict containing required canonical keys and any Jooble-specific
+            optional keys that have data.  Optional keys absent here are
+            defaulted by the base class ``normalise()`` wrapper.
         """
         salary_min, salary_max = parse_salary(raw.get("salary") or "")
 
@@ -256,8 +257,6 @@ class JoobleClient(JobSource):
             "location": raw.get("location", "") or "",
             "salary_min": salary_min,
             "salary_max": salary_max,
-            "salary_period": None,  # Jooble salary is free-text; period cannot be reliably inferred
-            "contract_type": None,
             "contract_time": contract_time,
             "description": strip_html(raw.get("snippet", "") or ""),
             "redirect_url": raw.get("link", "") or "",
