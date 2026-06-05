@@ -24,9 +24,12 @@ tracking: { epic: 751, milestone: 12, cycle: 749, depends_on: [747, 748] }
 > into shippable slices with per-slice design-fidelity gates and cross-cycle drift controls,
 > and proposes a set of GitHub sub-issues for the router to file under milestone #12.
 
-> **REVISED 2026-06-04 (post project-reviewer + inquisitor).** This revision absorbs a constructive
-> project-reviewer pass and an adversarial inquisitor pass, all findings re-verified against the LIVE
-> tree before integration. The 8-slice decomposition **survived** (still S0–S8); the changes harden
+> **REVISED 2026-06-04 (post project-reviewer + inquisitor; Slice P added).** This revision absorbs a
+> constructive project-reviewer pass and an adversarial inquisitor pass, all findings re-verified
+> against the LIVE tree before integration. **Slice P (early backend-less prototype, #776) was added per
+> user request** — it is backend-independent and runs in parallel with Cycles 0/1 and Slice 0, gated
+> only on vendor PR #765 (needs `docs/design/*`); see §4 and §6. The 8-slice decomposition **survived**
+> (still S0–S8); the changes harden
 > Slice 0's exit criteria and re-scope two slices rather than re-cutting the work. Summary of what
 > changed:
 > - **Slice 0 grew four hard gates** (was prose / partly-missing): (a) an **all-paths chokepoint
@@ -75,6 +78,14 @@ Cycle 0, and depends on the multi-role `matches` join authority established in C
 `:L431-L459`). Specifically, the feed read authority moves to a best-fit `DISTINCT ON` Match query
 in Cycle 1 (spec D19, `:L439-L449`); Cycle 2's feed surface builds directly on that query. Building
 the rail/inspector/roles-editor against a schema that does not yet exist would be speculative.
+
+**Exception — Slice P (backend-independent prototype, #776).** Slice P is explicitly not a
+data-wired vertical slice. It uses hardcoded fixture context — no live schema, no `services/api/*`
+calls — and is therefore **not blocked by Cycles 0/1 or Slice 0**. Its only gate is vendor PR #765
+(the `docs/design/*` files must be on `main` before the prototype can be built to spec). Slice P
+runs in parallel with the Cycle 0/1 critical path; its real Jinja templates are reused by Slices
+1–8 when those slices swap fixtures for live service-layer output. See §4 (Slice P subsection) and
+the dependency graph below.
 
 **Authority precedence** (when sources disagree, higher wins):
 1. The **LOCKED roles-foundation spec** model — `2026-05-29-job-matcher-2.0-roles-foundation-design.md §2`
@@ -322,6 +333,51 @@ service endpoint(s) + HTMX template + tests + a fidelity check against `docs/des
 
 ---
 
+### Slice P — Static Shell-B UI prototype (backend-less, fixtures only)  *(parallel — NOT blocked by Slice 0, Cycle 0, or Cycle 1)*
+
+**Tracked as #776. Gated only on vendor PR #765** (`docs/design/*` must be on `main`). All other
+vertical slices are blocked by Cycles 0/1 + Slice 0; Slice P is the single exception because it
+touches no live schema and calls no service layer.
+
+**Why it exists.** The plan as written gates the first clickable UI behind two full cycles of
+database and service-layer work. Slice P delivers a fully interactive Shell-B prototype immediately,
+in parallel, so design feedback and layout iteration can happen on the critical-path timeline rather
+than two cycles after it.
+
+**Built as real templates, not throwaway.** Slice P produces the actual Jinja templates that Slices
+1–8 later populate with live data. The fixture context objects are shaped per `docs/design/data-model.md`
+so they act as a field contract — when a later slice wires a service-layer call, it replaces a fixture
+dict with a function return that already matches the same shape. Accepted caveat: possible drift from
+final data-wired screens if `data-model.md` changes after Slice P lands; mitigated by building
+strictly to `data-model.md` shapes and flagging any mid-flight spec changes as a Slice P re-touch.
+
+**Scope (mirrors #776):**
+- Three-region grid (`ui-layout.md §2`).
+- Left rail: role quick-switcher (fixture roles) + three config destinations + Admin group + `.me`
+  footer; `--target` recolor on role switch; `jm_target` localStorage persistence.
+- View-aware context bar + feed-only subbar (`ui-layout.md §3–§4`).
+- Static layouts of every screen rendered against fixtures:
+  - Feed cards — per-role pills, salary-delta/no-salary badge, snippet visuals.
+  - Candidate Profile screen.
+  - Roles editor (master list + detail bands).
+  - Job Preferences screen.
+  - Inspector panel.
+  - Admin views.
+- Runnable via the existing Flask app: a `/prototype` route tree (or a `PROTOTYPE=1` feature flag)
+  so the prototype is clickable and screenshottable without any database present.
+- Fidelity against `ui-layout.md`, `design-principles.md`, and `docs/STYLE_GUIDE.md`.
+- CI green: `ruff check .`, `djlint templates/ --lint`, `pytest` (a lightweight route-smoke test
+  suite — no Postgres required since the prototype routes use fixture context only).
+
+**Depends on:** vendor PR #765 only (needs `docs/design/*` on `main`). Does NOT depend on Slice 0,
+Cycle 0, or Cycle 1.
+
+**Templates feed Slices 1–8.** Each later slice that wires a screen replaces the fixture context
+import with the appropriate `services/api/*` call and removes the `/prototype` route stub for that
+screen. No Jinja is discarded; the work is additive.
+
+---
+
 ### Vertical slices (each: service endpoint(s) + HTMX template + tests + fidelity check)
 
 Every vertical slice's **fidelity gate** = visual/interaction parity against `docs/design/ui-layout.md`
@@ -496,7 +552,14 @@ any existing routing). Do NOT add a resume-tailoring routing row here; it lands 
 ### Dependency graph / parallelization
 
 ```
-Slice 0  (foundation — BLOCKING: chokepoint+all-paths · schema-conformance · effective-resolver · error-contract)
+PR #765  (vendor-docs — docs/design/* lands on main)
+   │
+   ├──────────────────────────────────────────────────────────────────────────────┐
+   │                                                                              │
+   ▼                                                                              ▼
+Slice 0  (foundation — BLOCKING for S1–S8:                             Slice P  (backend-less prototype —
+          chokepoint+all-paths · schema-conformance ·                            PARALLEL, not blocked by S0/C0/C1)
+          effective-resolver · error-contract)                                   [fixture templates → reused by S1–S8]
    │
    ▼
 Slice 1  (shell + rail — Combined rail entry ships DISABLED/STUB)
@@ -515,6 +578,9 @@ Slice 3                        mixed-join)        Slice 6
                                Slice 8  (Admin — hosts log TEMPLATE over Slice-7 endpoint)
 ```
 
+- **Slice P is parallel and independent:** gated only on vendor PR #765; runs concurrently with
+  Cycles 0/1 and Slice 0. Its real Jinja templates are consumed by Slices 1–8 (fixtures swapped for
+  live service output). It does not block and is not blocked by the S0→S8 critical path.
 - **Strictly serial:** Slice 0 → Slice 1 (everything hangs off the shell). No vertical slice's fidelity
   gate opens until Slice 0's **schema-conformance test** (deliverable 5) is green.
 - **Parallelizable after Slice 1:** Slices 2, 4, 5, 7 are independent surfaces against distinct
@@ -557,6 +623,7 @@ All under **milestone #12**, epic #751, labeled `cycle-2`. Each is one slice.
 
 | # | Proposed title | Acceptance-criteria sketch |
 |---|---|---|
+| SP | `Cycle 2 · Slice P — Static Shell-B UI prototype (backend-less, fixtures only)` | **Already filed as #776 — do not refile.** Dependency: vendor PR #765 only (needs `docs/design/*` on `main`). Three-region grid + left rail (fixture roles, quick-switcher, `--target` recolor, `jm_target` localStorage) + view-aware context bar + feed-only subbar; static layouts of all screens (Feed cards incl. per-role pills/salary-delta/snippet visuals, Candidate Profile, Roles editor, Job Preferences, Inspector, Admin) rendered against `data-model.md`-shaped fixture context; runnable via a `/prototype` route tree or `PROTOTYPE=1` feature flag (clickable/screenshottable, no Postgres required); fidelity vs `ui-layout.md` + `design-principles.md` + `STYLE_GUIDE.md`; CI green (`ruff`, `djlint`, `pytest` route-smoke). Real Jinja templates — not throwaway; Slices 1–8 swap fixtures for live service output. |
 | S0 | `Cycle 2 · Slice 0 — Foundation: reconciliation doc + service seam + chokepoint + schema/effective/error gates` | Reconciliation delta doc (**R1–R6** + **five** §8 API decisions incl. salary-normalization + D14/D19 doc-trap flag) committed to `docs/design/`; `services/api/` skeleton over `db/` with centralized PATCH/pydantic + **error contract** (HTMX+JSON); `render_feed()`/`parse_feed_query()`/shared `_feed_cards.html`; **all 5 card-render paths classified**; 3 ADR-009 contract tests green (**`single_source` asserts the real include-site set**); **`test_cycle01_schema_conformance` green** (tables/types/D19 query match spec); **`effective.py::resolve_role` + cross-consumer contract test green; `ingest.py` calls it**; **#580/#581/#582 closed because the chokepoint+honest tests now exist** (router confirms still-open first); CI green. |
 | S1 | `Cycle 2 · Slice 1 — App shell + left rail + view-aware context bar/subbar` | Three-region grid; rail (role switcher + 3 config dests + Admin + `.me`); **Combined rail entry ships DISABLED/STUB gated on a `combined_enabled` signal** (enabled by S5); view-aware context bar (mgmt mode hides job chrome); feed-only subbar; `--target` recolor; `jm_target` persistence; `data-od-id` on regions; fidelity vs `ui-layout.md §2–§4`; CI green. |
 | S2 | `Cycle 2 · Slice 2 — Candidate Profile + Skills shared-bucket surface` | `candidate` singleton screen + `candidate/skills` bucket CRUD ({id,name,years}); **skill-delete service logic + unit test with a fixture role row** (real cross-role integration test deferred to S3); PDF-import carried forward; baseline scoring_notes/anti_preferences live here (R1); fidelity vs `§5.2`; CI green. |
@@ -584,6 +651,10 @@ All under **milestone #12**, epic #751, labeled `cycle-2`. Each is one slice.
 - Scope bounded: Slice 0 blocks; vertical slices enumerated; Cycle 3 (Resumes, #750) is explicitly
   out of scope (only `applied_resume_id` link-only tie-in appears, Slice 6; Slice 8 scope-guards out the
   resume-tailoring routing row).
+- **Slice P decouples UI feedback from the Cycle 0/1 critical path** (#776): by building real Jinja
+  templates against fixture context immediately (gated only on vendor PR #765), design-fidelity review
+  and layout iteration happen in parallel with schema and service-layer work rather than two cycles
+  after it. Slices 1–8 inherit the templates and replace fixture context with live service output.
 - Open questions listed: §8 (now five decisions + the D14/D19 upstream doc-trap).
 
 ---
