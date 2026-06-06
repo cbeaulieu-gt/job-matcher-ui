@@ -1,0 +1,125 @@
+{% extends "prototype/_shell.html" %}
+
+{% block page_title %}Candidate Profile{% endblock page_title %}
+
+{% block main_content %}
+  <div class="proto-view-wrap" data-od-id="view-profile">
+    <div class="proto-view-heading">Candidate Profile</div>
+
+    {# Identity card #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Identity</div>
+      <div class="proto-field-group">
+        <div class="proto-field">
+          <span class="proto-label">Name</span>
+          <span class="proto-value">{{ candidate.name }}</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Email</span>
+          <span class="proto-value">{{ candidate.email }}</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Current Role</span>
+          <span class="proto-value">{{ candidate.current_role }}</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Current Location</span>
+          <span class="proto-value">{{ candidate.current_location.label }}</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Country</span>
+          <span class="proto-value">{{ candidate.country }}</span>
+        </div>
+      </div>
+    </div>
+
+    {# Base salary card #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Base Salary</div>
+      <div class="proto-field-group">
+        <div class="proto-field">
+          <span class="proto-label">Current / Reference Comp</span>
+          <span class="proto-value">
+            {{ candidate.base_salary.currency }}
+            {{ "{:,}".format(candidate.base_salary.amount) }}
+            / {{ candidate.base_salary.period }}
+          </span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Role</span>
+          <span class="proto-value">
+            Comparison anchor for feed salary deltas.
+            Seeds new role target salary (editable per role).
+          </span>
+        </div>
+      </div>
+    </div>
+
+    {# Skills — shared bucket (data-model.md §A.3) #}
+    <div class="proto-section-card" id="proto-skills">
+      <div class="proto-section-title">Skills</div>
+      <div class="proto-skill-grid">
+        {% for skill in candidate.primary_skills %}
+          <span class="proto-skill-chip">
+            {{ skill.name }}
+            <span class="years">&middot; {{ skill.years }}y</span>
+          </span>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# Shared defaults card #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Shared Defaults</div>
+      <div class="proto-field-group">
+        <div class="proto-field">
+          <span class="proto-label">Seniority</span>
+          <span class="proto-value">{{ candidate.defaults.seniority }}</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Preferred Industries</span>
+          <span class="proto-value">
+            {{ candidate.defaults.preferred_industries | join(', ') }}
+          </span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Anti-preferences</span>
+          <span class="proto-value">
+            {{ candidate.anti_preferences | join(', ') }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    {# Education card #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Education</div>
+      {% for edu in candidate.education %}
+        <div class="proto-field-group">
+          <div class="proto-field">
+            <span class="proto-label">Degree</span>
+            <span class="proto-value">
+              {{ edu.degree_type }} {{ edu.degree_field }} &mdash;
+              {{ edu.school }} ({{ edu.graduation_year }})
+            </span>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    {# Linked resumes reference #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Resumes</div>
+      {% for resume in resumes %}
+        <div class="proto-field" style="margin-bottom: 8px">
+          <span class="proto-value">{{ resume.label }}</span>
+          <span class="proto-label">
+            {{ resume.source }}
+            &middot;
+            updated {{ resume.updated[:10] }}
+          </span>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock main_content %}

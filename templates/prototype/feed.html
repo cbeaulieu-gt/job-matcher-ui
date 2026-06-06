@@ -1,0 +1,167 @@
+{% extends "prototype/_shell.html" %}
+
+{% block page_title %}Feed &mdash; {{ active_role.name if active_role else 'Combined' }}{% endblock page_title %}
+
+{% block main_content %}
+  <div class="proto-content" data-od-id="feed-content">
+    <div class="proto-feed" data-od-id="feed">
+      {% for job in jobs %}
+        {% set match = job._active_match %}
+        {% set tier = job._tier %}
+
+        <div
+          class="proto-card{% if job.state == 'snippet' %} snippet-state{% endif %}{% if job.user_state == 'dismissed' %} dismissed{% endif %}"
+          role="listitem"
+          data-job-id="{{ job.id }}"
+          data-verdict="{{ match.verdict if match else '' }}"
+        >
+          {# Tier flag #}
+          <div class="proto-card-flag {{ tier }}"></div>
+
+          {# Score badge #}
+          <div class="proto-card-score-wrap">
+            {% if job.state == 'snippet' or not match %}
+              <span class="proto-score-badge tier-null">&mdash;</span>
+            {% else %}
+              <span class="proto-score-badge tier-{{ tier }}">
+                {{ "%.1f"|format(match.score) }}
+              </span>
+            {% endif %}
+          </div>
+
+          {# Card body #}
+          <div class="proto-card-body">
+            {# Row 1: title #}
+            <div class="proto-card-title">{{ job.title }}</div>
+
+            {# Row 2: meta #}
+            <div class="proto-card-meta">
+              <span class="meta-company">{{ job.company }}</span>
+              <span class="proto-meta-sep">&middot;</span>
+              <span>{{ job.location.label }}</span>
+              <span class="proto-meta-sep">&middot;</span>
+
+              {# Salary delta vs base #}
+              {% if job.salary is none or job.salary_delta_pct is none %}
+                <span class="proto-no-salary" data-od-id="no-salary">no salary</span>
+              {% elif job.salary_delta_pct > 0 %}
+                <span class="proto-salary-delta up">+{{ job.salary_delta_pct }}% vs base</span>
+              {% elif job.salary_delta_pct < 0 %}
+                <span class="proto-salary-delta down">{{ job.salary_delta_pct }}% vs base</span>
+              {% else %}
+                <span class="proto-salary-delta flat">at base</span>
+              {% endif %}
+            </div>
+
+            {# Row 3: chips + badges #}
+            <div class="proto-card-chips">
+              {% if match %}
+                {% for sid in match.matched_skills %}
+                  <span class="proto-chip matched">{{ skill_map[sid].name if sid in skill_map else sid }}</span>
+                {% endfor %}
+                {% for sid in match.missing_skills %}
+                  <span class="proto-chip missing">{{ skill_map[sid].name if sid in skill_map else sid }}</span>
+                {% endfor %}
+              {% endif %}
+
+              {# Remote / hybrid badge #}
+              {% if job.remote_type == 'remote' %}
+                <span class="proto-badge remote">Remote</span>
+              {% elif job.remote_type == 'hybrid' %}
+                <span class="proto-badge hybrid">Hybrid</span>
+              {% endif %}
+
+              {# Snippet badge #}
+              {% if job.state == 'snippet' %}
+                <span class="proto-badge snippet">Awaiting scrape</span>
+              {% endif %}
+
+              {# Source badge #}
+              <span class="proto-badge source">{{ job.source }}</span>
+
+              {# New badge #}
+              {% if job.user_state == 'new' %}
+                <span class="proto-badge new-badge">New</span>
+              {% endif %}
+            </div>
+          </div>
+
+          {# Card actions #}
+          <div class="proto-card-actions">
+            <button
+              class="proto-action-btn view"
+              type="button"
+              title="View listing"
+              aria-label="View listing"
+            >
+              &#10138;
+            </button>
+            <button
+              class="proto-action-btn{% if job.user_state == 'bookmarked' %} bookmarked{% endif %}"
+              type="button"
+              title="Bookmark"
+              aria-label="Bookmark"
+            >
+              &#9733;
+            </button>
+            <button
+              class="proto-action-btn{% if job.user_state == 'applied' %} applied{% endif %}"
+              type="button"
+              title="Mark applied"
+              aria-label="Mark applied"
+            >
+              &#10003;
+            </button>
+            <button
+              class="proto-action-btn"
+              type="button"
+              title="Dismiss"
+              aria-label="Dismiss"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      {% else %}
+        <div class="proto-empty-state">
+          <div class="proto-empty-icon">&#9776;</div>
+          <div class="proto-empty-title">No listings yet</div>
+          <div class="proto-empty-body">
+            Trigger an ingest run to discover jobs<br />
+            matching this target role.
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock main_content %}
+
+{% block inspector %}
+  <aside
+    class="proto-inspector"
+    data-od-id="inspector"
+    aria-label="Job inspector"
+  >
+    <div class="proto-inspector-header">
+      <span class="proto-inspector-title">Job Detail</span>
+      <button
+        class="proto-inspector-close"
+        type="button"
+        aria-label="Close inspector"
+      >
+        &times;
+      </button>
+    </div>
+    <div class="proto-inspector-body" data-od-id="inspector-body">
+      {% block inspector_content %}
+        <div class="proto-empty-state">
+          <div class="proto-empty-icon">&#9635;</div>
+          <div class="proto-empty-title">Select a job</div>
+          <div class="proto-empty-body">
+            Click any listing to see the full<br />score breakdown and apply.
+          </div>
+        </div>
+      {% endblock inspector_content %}
+    </div>
+  </aside>
+{% endblock inspector %}

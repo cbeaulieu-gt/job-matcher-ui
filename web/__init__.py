@@ -195,6 +195,7 @@ def create_app() -> Flask:
     from web.feed import feed_bp  # noqa: PLC0415
     from web.ingest import ingest_bp  # noqa: PLC0415
     from web.profile import profile_bp  # noqa: PLC0415
+    from web.prototype import prototype_bp  # noqa: PLC0415
     from web.settings import settings_bp  # noqa: PLC0415
 
     app.register_blueprint(feed_bp, url_prefix="")
@@ -202,6 +203,7 @@ def create_app() -> Flask:
     app.register_blueprint(settings_bp, url_prefix="")
     app.register_blueprint(profile_bp, url_prefix="")
     app.register_blueprint(admin_bp, url_prefix="")
+    app.register_blueprint(prototype_bp, url_prefix="/prototype")
 
     # ------------------------------------------------------------------
     # 10. Database initialisation and plugin registration.

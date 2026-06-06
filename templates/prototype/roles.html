@@ -1,0 +1,246 @@
+{% extends "prototype/_shell.html" %}
+
+{% block page_title %}Roles{% endblock page_title %}
+
+{% block main_content %}
+  <div class="proto-roles-layout" data-od-id="view-roles" style="flex: 1; overflow: hidden">
+
+    {# Master list #}
+    <div class="proto-roles-list" data-od-id="roles-list">
+      {% for role in roles %}
+        <a
+          href="/prototype/roles?role={{ role.id }}"
+          class="proto-roles-list-item{% if selected_role_id == role.id %} active{% endif %}{% if not role.active %} paused{% endif %}"
+          style="--target: {{ role.color }}"
+        >
+          <span
+            class="proto-roles-list-dot"
+            style="background: {{ role.color }}; opacity: {{ '1' if role.active else '0.35' }}"
+          ></span>
+          <span class="proto-roles-list-name">{{ role.name }}</span>
+          <span class="proto-roles-list-count">{{ role.match_count }}</span>
+        </a>
+      {% endfor %}
+      <div class="proto-roles-new">
+        <span>&#8853;</span> New target role
+      </div>
+    </div>
+
+    {# Detail editor #}
+    {% if selected_role %}
+      <div class="proto-roles-detail" data-od-id="roles-detail">
+
+        {# Role title + actions row #}
+        <div style="display: flex; align-items: center; gap: 12px">
+          <span
+            class="proto-role-dot"
+            style="--role-color: {{ selected_role.color }}"
+          ></span>
+          <span
+            class="proto-ctx-target-name"
+            style="color: {{ selected_role.color }}; font-size: 1.0rem"
+          >
+            {{ selected_role.name }}
+          </span>
+          {% if not selected_role.active %}
+            <span class="proto-badge hybrid">Paused</span>
+          {% endif %}
+          <div style="flex: 1"></div>
+          <button type="button" class="proto-override-toggle-btn">Save</button>
+        </div>
+
+        {# ── TIER 1: TARGET-DEFINED ─────────────────────────────── #}
+        <div class="proto-tier-band" data-od-id="band-tier1">
+          <div class="proto-tier-band-header">
+            <span class="proto-tier-band-label">Target-Defined</span>
+            <span class="proto-tier-band-hint">this role only &mdash; no shared base</span>
+          </div>
+          <div class="proto-tier-band-body">
+            <div class="proto-field">
+              <span class="proto-label">Search query (what)</span>
+              <input
+                class="proto-input"
+                type="text"
+                value="{{ selected_role.search_what }}"
+                aria-label="Search query"
+              />
+            </div>
+            <div class="proto-field">
+              <span class="proto-label">Title include</span>
+              <input
+                class="proto-input"
+                type="text"
+                value="{{ selected_role.prefilter.title_include | join(', ') }}"
+                aria-label="Title include patterns"
+              />
+            </div>
+            <div class="proto-field">
+              <span class="proto-label">Title exclude</span>
+              <input
+                class="proto-input"
+                type="text"
+                value="{{ selected_role.prefilter.title_exclude | join(', ') }}"
+                aria-label="Title exclude patterns"
+              />
+            </div>
+            <div class="proto-field">
+              <span class="proto-label">Match threshold (0&ndash;10)</span>
+              <input
+                class="proto-input"
+                type="number"
+                value="{{ selected_role.threshold }}"
+                min="0"
+                max="10"
+                step="0.5"
+                style="width: 80px"
+                aria-label="Match threshold"
+              />
+            </div>
+            <div class="proto-field">
+              <span class="proto-label">Scoring notes</span>
+              {% for note in selected_role.scoring_notes %}
+                <input
+                  class="proto-input"
+                  type="text"
+                  value="{{ note }}"
+                  aria-label="Scoring note"
+                  style="margin-bottom: 4px"
+                />
+              {% endfor %}
+            </div>
+            <div class="proto-field">
+              <span class="proto-label">Target salary</span>
+              <input
+                class="proto-input"
+                type="number"
+                value="{{ selected_role.target_salary }}"
+                style="width: 140px"
+                aria-label="Target salary"
+              />
+            </div>
+            <div class="proto-field">
+              <span class="proto-label">Linked default resume</span>
+              <select class="proto-input" aria-label="Default resume">
+                <option value="">&mdash; none &mdash;</option>
+                {% for resume in resumes %}
+                  <option
+                    value="{{ resume.id }}"
+                    {% if selected_role.default_resume_id == resume.id %}
+                      selected
+                    {% endif %}
+                  >
+                    {{ resume.label }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {# ── TIER 2: SHARED, OVERRIDABLE ───────────────────────── #}
+        <div class="proto-tier-band" data-od-id="band-tier2">
+          <div class="proto-tier-band-header">
+            <span class="proto-tier-band-label">Shared &mdash; Overridable</span>
+            <span class="proto-tier-band-hint">inherits candidate default; role may override</span>
+          </div>
+          <div class="proto-tier-band-body">
+            {# Seniority #}
+            <div class="proto-field">
+              <span class="proto-label">Seniority</span>
+              <div class="proto-override-row">
+                {% if 'seniority' in selected_role.overrides %}
+                  <input
+                    class="proto-input"
+                    type="text"
+                    value="{{ selected_role.overrides.seniority }}"
+                    aria-label="Seniority override"
+                    style="flex: 1"
+                  />
+                  <button class="proto-override-toggle-btn" type="button">
+                    Revert to shared
+                  </button>
+                {% else %}
+                  <span class="proto-override-inherited">
+                    {{ candidate.defaults.seniority }} (shared default)
+                  </span>
+                  <button class="proto-override-toggle-btn" type="button">
+                    Override
+                  </button>
+                {% endif %}
+              </div>
+            </div>
+            {# Preferred industries #}
+            <div class="proto-field">
+              <span class="proto-label">Preferred Industries</span>
+              <div class="proto-override-row">
+                {% if 'preferred_industries' in selected_role.overrides %}
+                  <input
+                    class="proto-input"
+                    type="text"
+                    value="{{ selected_role.overrides.preferred_industries | join(', ') }}"
+                    aria-label="Preferred industries override"
+                    style="flex: 1"
+                  />
+                  <button class="proto-override-toggle-btn" type="button">
+                    Revert to shared
+                  </button>
+                {% else %}
+                  <span class="proto-override-inherited">
+                    {{ candidate.defaults.preferred_industries | join(', ') }}
+                    (shared default)
+                  </span>
+                  <button class="proto-override-toggle-btn" type="button">
+                    Override
+                  </button>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {# ── SKILLS APPLICABLE ─────────────────────────────────── #}
+        <div class="proto-tier-band" data-od-id="band-skills">
+          <div class="proto-tier-band-header">
+            <span class="proto-tier-band-label">Skills Applicable</span>
+            <span class="proto-tier-band-hint">
+              toggle which shared skills apply to this role
+            </span>
+          </div>
+          <div class="proto-tier-band-body">
+            <div class="proto-skills-applicable">
+              {% for skill in candidate.primary_skills %}
+                {% set is_on = skill.id in selected_role.applicable_skills %}
+                <span
+                  class="proto-skill-toggle-chip {{ 'on' if is_on else 'off' }}"
+                  role="checkbox"
+                  aria-checked="{{ 'true' if is_on else 'false' }}"
+                  tabindex="0"
+                >
+                  {{ skill.name }}
+                  <span style="opacity: 0.6; font-size: 0.58em">
+                    &middot; {{ skill.years }}y
+                  </span>
+                </span>
+              {% endfor %}
+            </div>
+            <div style="margin-top: 8px">
+              <a href="/prototype/profile#proto-skills" class="proto-role-manage">
+                &rarr; Manage shared skills (Candidate Profile)
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    {% else %}
+      <div class="proto-empty-state" data-od-id="roles-detail">
+        <div class="proto-empty-icon">&#10017;</div>
+        <div class="proto-empty-title">No roles configured</div>
+        <div class="proto-empty-body">
+          Add a target role to begin searching.
+        </div>
+      </div>
+    {% endif %}
+
+  </div>
+{% endblock main_content %}

@@ -1,0 +1,95 @@
+{% extends "prototype/_shell.html" %}
+
+{% block page_title %}Job Preferences{% endblock page_title %}
+
+{% block main_content %}
+  <div class="proto-view-wrap" data-od-id="view-preferences">
+    <div class="proto-view-heading">Job Preferences</div>
+
+    {# Locations card #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Locations</div>
+      <div class="proto-field-group">
+        <div class="proto-field">
+          <span class="proto-label">Willing-to-work locations</span>
+          <div class="proto-pref-location-list">
+            {% for loc in preferences.locations %}
+              <div class="proto-pref-location-item">
+                <span class="proto-pref-location-label">{{ loc.label }}</span>
+                <button
+                  class="proto-pref-location-remove"
+                  type="button"
+                  aria-label="Remove {{ loc.label }}"
+                >
+                  &times;
+                </button>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Search radius</span>
+          <span class="proto-value">{{ preferences.radius_km }} km</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Max listing age</span>
+          <span class="proto-value">{{ preferences.max_days_old }} days</span>
+        </div>
+      </div>
+    </div>
+
+    {# Work Models card #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Work Models</div>
+      <div class="proto-field-group">
+        <div class="proto-field">
+          <span class="proto-label">
+            Hard pull filter &mdash; excludes non-matching postings at ingestion
+          </span>
+          <div class="proto-multi-select">
+            {% for model in ['onsite', 'hybrid', 'remote'] %}
+              <button
+                type="button"
+                class="proto-multi-btn {{ 'selected' if model in preferences.work_arrangement else 'unselected' }}"
+              >
+                {{ model | capitalize }}
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Job Types card #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Job Types</div>
+      <div class="proto-field-group">
+        <div class="proto-field">
+          <span class="proto-label">
+            Hard pull filter &mdash; excludes non-matching postings at ingestion
+          </span>
+          <div class="proto-multi-select">
+            {% for jtype in [
+              ('full_time', 'Full-Time'),
+              ('contract', 'Contract'),
+              ('contract_to_hire', 'Contract-to-Hire'),
+              ('part_time', 'Part-Time'),
+              ('internship', 'Internship')
+            ] %}
+              <button
+                type="button"
+                class="proto-multi-btn {{ 'selected' if jtype[0] in preferences.job_types else 'unselected' }}"
+              >
+                {{ jtype[1] }}
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="proto-field-group">
+      <button type="button" class="proto-override-toggle-btn">Save Preferences</button>
+    </div>
+  </div>
+{% endblock main_content %}
