@@ -302,12 +302,16 @@
     <div class="proto-insp-title">' + (title ? title.textContent : '') + '</div>\
   </div>\
 </div>\
-' + (verdict ? '<div class="proto-insp-section"><div class="proto-insp-section-label">Verdict</div><div class="proto-insp-verdict">' + verdict + '</div></div>' : '') + '\
+' + (verdict ? '<div class="proto-insp-section"><div class="proto-insp-section-label">Verdict</div><div class="proto-insp-verdict"></div></div>' : '') + '\
 <div class="proto-insp-resume">\
   <div class="proto-insp-section-label">Resume</div>\
   <select class="proto-insp-resume-select"><option>SWE &mdash; backend v2</option><option>General base</option></select>\
   <button type="button" class="proto-insp-apply-btn">Attach &amp; Apply &rarr;</button>\
 </div>';
+            if (verdict) {
+              var verdictEl = body.querySelector('.proto-insp-verdict');
+              if (verdictEl) { verdictEl.textContent = verdict; }
+            }
           });
         });
       })();

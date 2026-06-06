@@ -139,13 +139,26 @@ def prototype_feed():
             if any(m["role_id"] == role_id for m in j.get("matches", []))
         ]
 
-    # Annotate each job with the active-role match for easier template use
+    # Annotate each job with the active-role match for easier template use.
+    # For the combined view there is no single role_id to key on, so select
+    # the highest-scoring match as the representative (None when no matches).
     annotated = []
     for job in jobs:
-        match = next(
-            (m for m in job.get("matches", []) if m["role_id"] == role_id),
-            None,
-        )
+        if role_id == "combined":
+            matches = job.get("matches", [])
+            match = (
+                max(matches, key=lambda m: m["score"])
+                if matches
+                else None
+            )
+        else:
+            match = next(
+                (
+                    m for m in job.get("matches", [])
+                    if m["role_id"] == role_id
+                ),
+                None,
+            )
         annotated.append(
             {
                 **job,

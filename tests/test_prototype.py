@@ -9,6 +9,8 @@ in any environment where the project dependencies are installed.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 
@@ -135,6 +137,52 @@ class TestPrototypeFeed:
         body = response.data.decode("utf-8")
 
         assert 'data-od-id="rail-roles"' in body
+
+
+class TestPrototypeFeedCombined:
+    """Combined feed view must render real match data for every card."""
+
+    def test_combined_feed_returns_200(self, client) -> None:
+        """GET /prototype/feed?role=combined must return HTTP 200."""
+        response = client.get("/prototype/feed?role=combined")
+
+        assert response.status_code == 200
+
+    def test_combined_feed_cards_have_real_scores(self, client) -> None:
+        """Combined view cards must carry real score values, not 'null'.
+
+        Before fix #1 the annotation loop keyed on the literal string
+        "combined", which never matched any match entry, so every card
+        rendered as ``tier-null`` with no score.  This test asserts that
+        at least one scored card exists (a non-null tier badge appears)
+        so a regression would be caught.
+        """
+        response = client.get("/prototype/feed?role=combined")
+        body = response.data.decode("utf-8")
+
+        # At least one fixture job has a scored match; a non-null tier
+        # badge (tier-high or tier-mid or tier-low) must appear.
+        # If the bug regressed, every badge would be "tier-null".
+        assert "tier-high" in body or "tier-mid" in body, (
+            "Combined view rendered no scored badges (tier-high/mid) — "
+            "likely the combined-view annotation bug regressed."
+        )
+
+    def test_combined_feed_verdict_in_data_attr(self, client) -> None:
+        """Combined view cards must carry a non-empty data-verdict attribute.
+
+        A non-empty verdict in a data attr confirms _active_match was
+        populated (highest-score representative), not left as None.
+        """
+        response = client.get("/prototype/feed?role=combined")
+        body = response.data.decode("utf-8")
+
+        # data-verdict="..." with non-empty content must appear at least once
+        verdicts = re.findall(r'data-verdict="([^"]+)"', body)
+        assert len(verdicts) > 0, (
+            "Combined view has no data-verdict attributes — "
+            "_active_match is None for all cards."
+        )
 
 
 # ---------------------------------------------------------------------------
