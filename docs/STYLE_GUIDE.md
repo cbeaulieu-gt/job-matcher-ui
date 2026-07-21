@@ -801,3 +801,88 @@ Follow these when writing new CSS or HTML:
 7. **Transitions are short.** Use 100–200ms ease for color/background/border transitions. No bounce, no spring, no delays.
 
 8. **Binary controls use the toggle switch pattern,** not a styled `<input type="checkbox">`. See §5 Toggle Switch.
+
+---
+
+## 8. Shell-B Prototype (static, `/prototype/...` routes)
+
+The Shell-B prototype lives at `static/prototype.css` and `templates/prototype/`.
+It adds new tokens and CSS classes on top of the base `style.css` design system.
+**All existing token rules apply** — no hard-coded hex, no tier-color decorative use.
+
+### New design tokens (Shell-B only — in `static/prototype.css`)
+
+| Token | Value | Use |
+|---|---|---|
+| `--rail-width` | `236px` | Left rail column width |
+| `--inspector-width` | `360px` | Right inspector column width |
+| `--ctx-height` | `52px` | Context bar height |
+| `--subbar-height` | `44px` | Feed-only subbar height |
+| `--target-swe` | `#f5a623` | SWE role identity color |
+| `--target-data` | `#4dd2f5` | Data Engineer identity color |
+| `--target-platform` | `#b58cf5` | Platform Engineer identity color |
+| `--target` | (dynamic) | Active role identity color; bound via `data-target` attribute on `.proto-shell`; whole shell recolors on role switch |
+| `--flag-w` | `4px` | Feed card left-border tier flag width |
+| `--salary-up` | `var(--score-high-text)` | Positive salary delta color |
+| `--salary-down` | `var(--score-low-text)` | Negative salary delta color |
+| `--salary-flat` | `var(--text-muted)` | Flat salary delta color |
+
+### Shell-B class index (key classes only)
+
+| Class / Selector | Purpose |
+|---|---|
+| `.proto-shell` | Three-column CSS grid: `var(--rail-width) 1fr [var(--inspector-width)]` |
+| `.proto-shell.inspector-open` | Reveals third column (inspector) |
+| `[data-target="swe\|data\|platform\|combined"]` | Sets `--target` for shell recolor |
+| `.proto-rail` | Left rail (fixed width, flex column) |
+| `.proto-rail-roles` | Role quick-switcher block (`data-od-id="rail-roles"`) |
+| `.proto-role-item` | Single role row in the switcher; `--role-color` var for the dot |
+| `.proto-nav-item` | Config destination nav link |
+| `.proto-ctx` | Context bar (`data-od-id="context"`) — view-aware header |
+| `.proto-subbar` | Feed-only filter bar (`data-od-id="filters"`) — hidden on management views |
+| `.proto-feed` | Feed card list (`data-od-id="feed"`) |
+| `.proto-card` | Feed card row; `.snippet-state` modifier for unscored cards |
+| `.proto-card-flag` | 4px left-border tier stripe; `.high / .mid / .low` modifiers |
+| `.proto-score-badge` | Per-card score badge; `.tier-high / .tier-mid / .tier-low / .tier-null` |
+| `.proto-salary-delta` | Salary delta vs base; `.up / .down / .flat` color modifiers |
+| `.proto-no-salary` | Red-flag pill for postings with no extracted salary |
+| `.proto-chip` | Skill chip; `.matched` (green) / `.missing` (red) |
+| `.proto-badge` | Generic pill badge; `.remote / .hybrid / .snippet / .source / .new-badge` |
+| `.proto-role-pill` | Per-target color pill (Combined view); uses `--pill-color` CSS var |
+| `.proto-inspector` | Right inspector panel (`data-od-id="inspector"`) |
+| `.proto-tier-band` | Roles editor tier band (Target-Defined / Shared / Skills) |
+| `.proto-skill-toggle-chip` | Skills applicability toggle chip; `.on / .off` state |
+| `.proto-override-row` | Tier-2 field with inherited value + Override / Revert button |
+| `.proto-ingest-fab` | Bottom-right floating ingest trigger (`data-od-id="ingest-fab"`) |
+| `.proto-kpi-box` | Admin stats KPI box |
+| `.proto-admin-table` | Admin data table |
+| `.proto-source-status` | Source status pill; `.ok / .warn / .off` |
+
+### `data-od-id` attribute coverage (Shell-B)
+
+Every major region carries `data-od-id` for individual addressability:
+
+`shell` · `rail` · `rail-roles` · `main` · `context` · `ctx-match-count` ·
+`filters` · `feed` · `feed-content` · `inspector` · `inspector-body` ·
+`ingest-fab` · `view-profile` · `view-roles` · `view-preferences` · `view-admin` ·
+`roles-list` · `roles-detail` · `band-tier1` · `band-tier2` · `band-skills` ·
+`admin-stats`
+
+### View-aware context bar rules
+
+- **Feed mode** (`is_feed=True`): renders target dot + name + criteria chips + match count (`data-od-id="ctx-match-count"`) + live ingest indicator.
+- **Management mode** (`is_management=True`): renders view icon + title + descriptor. **No** criteria chips, no match count — those are feed-only.
+- Subbar (`data-od-id="filters"`) renders **only on feed views**; it is absent on Profile / Roles / Job Preferences / Admin.
+
+### Base template inheritance
+
+All prototype views extend `templates/prototype/_shell.html` via `{% extends %}` / `{% block %}`.
+Blocks: `page_title` · `main_content` · `inspector` · `inspector_content`.
+All `{% endblock %}` tags must include the block name (`{% endblock main_content %}`).
+
+### Fixture data contract
+
+`web/prototype_fixtures.py` is the data layer for the prototype. All shapes follow
+`docs/design/data-model.md §A`. Slices 2–8 replace fixture context with real
+service/DB output; the route handlers and templates are unchanged by that swap.
+Never add DB access or Flask imports to `prototype_fixtures.py`.

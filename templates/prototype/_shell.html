@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>job_matcher · {% block page_title %}Prototype{% endblock page_title %}</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+    <link rel="stylesheet" href="/static/style.css" />
+    <link rel="stylesheet" href="/static/prototype.css" />
+  </head>
+  <body class="proto-body">
+    {# ── Shell: three-region CSS grid ─────────────────────────── #}
+    <div
+      class="proto-shell{% if view == 'feed' %} inspector-open{% endif %}"
+      data-od-id="shell"
+      data-target="{{ active_role_id or 'swe' }}"
+      id="proto-shell"
+    >
+      {# ────────────────────────────────────────────────────────── #}
+      {# RAIL (left, 236px)                                         #}
+      {# ────────────────────────────────────────────────────────── #}
+      <aside class="proto-rail" data-od-id="rail">
+        {# Logo #}
+        <div class="proto-rail-header">
+          <a href="/prototype/feed" class="proto-logo">
+            job<span class="accent">_</span>matcher
+          </a>
+        </div>
+
+        {# Role quick-switcher — data-od-id="rail-roles" #}
+        <div class="proto-rail-roles" data-od-id="rail-roles">
+          <div class="proto-rail-label">Targets</div>
+          {% for role in roles %}
+            <a
+              href="/prototype/feed?role={{ role.id }}"
+              class="proto-role-item{% if view == 'feed' and active_role_id == role.id %} active{% endif %}{% if not role.active %} paused{% endif %}"
+              style="--role-color: {{ role.color }}"
+            >
+              <span class="proto-role-dot{% if not role.active %} paused{% endif %}"></span>
+              <span class="proto-role-name">{{ role.name }}</span>
+              <span class="proto-role-count">{{ role.match_count }}</span>
+            </a>
+          {% endfor %}
+          {# Combined view #}
+          <a
+            href="/prototype/feed?role=combined"
+            class="proto-role-item proto-role-combined{% if view == 'feed' and active_role_id == 'combined' %} active{% endif %}"
+          >
+            <span class="proto-role-dot" style="background: var(--text-muted)"></span>
+            <span class="proto-role-name">Combined</span>
+          </a>
+          <a href="/prototype/roles" class="proto-role-manage">Manage targets&hellip;</a>
+        </div>
+
+        {# Config destinations — Browse #}
+        <div class="proto-rail-nav">
+          <div class="proto-rail-label">Browse</div>
+          <a
+            href="/prototype/feed"
+            class="proto-nav-item{% if view == 'feed' %} active{% endif %}"
+          >
+            <span class="proto-nav-icon">&#9776;</span>
+            <span>Feed</span>
+          </a>
+
+          <div class="proto-nav-divider"></div>
+          <div class="proto-rail-label">Configure</div>
+
+          <a
+            href="/prototype/profile"
+            class="proto-nav-item{% if view == 'profile' %} active{% endif %}"
+          >
+            <span class="proto-nav-icon">&#9678;</span>
+            <span>Candidate Profile</span>
+          </a>
+          <a
+            href="/prototype/roles"
+            class="proto-nav-item{% if view == 'roles' %} active{% endif %}"
+          >
+            <span class="proto-nav-icon">&#10017;</span>
+            <span>Roles</span>
+          </a>
+          <a
+            href="/prototype/preferences"
+            class="proto-nav-item{% if view == 'preferences' %} active{% endif %}"
+          >
+            <span class="proto-nav-icon">&#10782;</span>
+            <span>Job Preferences</span>
+          </a>
+
+          <div class="proto-nav-divider"></div>
+
+          <a
+            href="/prototype/admin"
+            class="proto-nav-item{% if view == 'admin' %} active{% endif %}"
+          >
+            <span class="proto-nav-icon">&#9881;</span>
+            <span>Admin</span>
+          </a>
+        </div>
+
+        {# .me footer #}
+        <div class="proto-rail-me">
+          <div class="proto-me-avatar">
+            {{ candidate.name[:2] | upper }}
+          </div>
+          <span class="proto-me-name">{{ candidate.name }}</span>
+          <span class="proto-me-cog" title="Settings">&#9881;</span>
+        </div>
+      </aside>
+
+      {# ────────────────────────────────────────────────────────── #}
+      {# MAIN (fluid)                                               #}
+      {# ────────────────────────────────────────────────────────── #}
+      <main class="proto-main" data-od-id="main">
+
+        {# Context bar — view-aware — data-od-id="context" #}
+        <div class="proto-ctx" data-od-id="context">
+          {% if is_feed %}
+            {# Feed mode: target dot + name + criteria chips + match count #}
+            <span
+              class="proto-ctx-target-dot"
+              style="background: {{ active_role.color if active_role else 'var(--text-muted)' }}"
+            ></span>
+            <span class="proto-ctx-target-name">
+              {{ active_role.name if active_role else 'Combined' }}
+            </span>
+            <div class="proto-ctx-chips">
+              {% if active_role %}
+                <span class="proto-ctx-chip">
+                  {{ active_role.search_what | truncate(28, true) }}
+                </span>
+                <span class="proto-ctx-chip">
+                  score &ge; {{ active_role.threshold }}
+                </span>
+                {% if active_role.prefilter.title_include %}
+                  <span class="proto-ctx-chip">
+                    +{{ active_role.prefilter.title_include | join(", ") | truncate(24, true) }}
+                  </span>
+                {% endif %}
+              {% endif %}
+            </div>
+            <span class="proto-ctx-match-count" data-od-id="ctx-match-count">
+              {{ total_jobs }} match{{ '' if total_jobs == 1 else 'es' }}
+            </span>
+            <span class="proto-ctx-ingest-indicator">
+              <span class="proto-ingest-dot"></span>
+              live
+            </span>
+          {% else %}
+            {# Management mode: icon + title + descriptor #}
+            <span class="proto-ctx-view-icon">{{ view_head.icon }}</span>
+            <span class="proto-ctx-view-title">{{ view_head.title }}</span>
+            <span class="proto-ctx-sep">&mdash;</span>
+            <span class="proto-ctx-view-desc">{{ view_head.desc }}</span>
+          {% endif %}
+        </div>
+
+        {# Subbar — feed-only — data-od-id="filters" #}
+        {% if is_feed %}
+          <div class="proto-subbar" data-od-id="filters">
+            <div class="proto-filter-seg">
+              <button class="proto-filter-seg-btn active" type="button">All</button>
+              <button class="proto-filter-seg-btn" type="button">Full jobs</button>
+              <button class="proto-filter-seg-btn" type="button">Snippets</button>
+            </div>
+            <input
+              class="proto-subbar-search"
+              type="text"
+              placeholder="Search titles, companies&hellip;"
+              aria-label="Search feed"
+            />
+            <div class="proto-subbar-spacer"></div>
+            <select class="proto-subbar-sort" aria-label="Sort">
+              <option>Score</option>
+              <option>Date posted</option>
+            </select>
+          </div>
+        {% endif %}
+
+        {# Active view body #}
+        {% block main_content %}{% endblock main_content %}
+
+        {# Ingest FAB — feed/role views only — data-od-id="ingest-fab" #}
+        {% if is_feed %}
+          <button
+            class="proto-ingest-fab"
+            type="button"
+            data-od-id="ingest-fab"
+            aria-label="Open ingest log"
+          >
+            <span class="proto-ingest-dot"></span>
+            Ingest
+          </button>
+        {% endif %}
+
+      </main>
+
+      {# ────────────────────────────────────────────────────────── #}
+      {# INSPECTOR (360px, right, feed only)                        #}
+      {# ────────────────────────────────────────────────────────── #}
+      {% block inspector %}
+        <aside
+          class="proto-inspector"
+          data-od-id="inspector"
+          aria-label="Job inspector"
+        >
+          <div class="proto-inspector-header">
+            <span class="proto-inspector-title">Job Detail</span>
+            <button
+              class="proto-inspector-close"
+              type="button"
+              aria-label="Close inspector"
+            >
+              &times;
+            </button>
+          </div>
+          <div class="proto-inspector-body" data-od-id="inspector-body">
+            {% block inspector_content %}
+              <div class="proto-empty-state">
+                <div class="proto-empty-icon">&#9635;</div>
+                <div class="proto-empty-title">Select a job</div>
+                <div class="proto-empty-body">
+                  Click any listing to see the full<br />score breakdown and apply.
+                </div>
+              </div>
+            {% endblock inspector_content %}
+          </div>
+        </aside>
+      {% endblock inspector %}
+
+    </div>{# /proto-shell #}
+
+    {# Minimal JS: target recolor on role switch + segment button toggle #}
+    <script>
+      (function () {
+        'use strict';
+        // Restore target from localStorage
+        var shell = document.getElementById('proto-shell');
+        var stored = localStorage.getItem('jm_target');
+        if (stored && shell) {
+          shell.setAttribute('data-target', stored);
+        }
+
+        // Segment filter buttons — toggle active class
+        document.querySelectorAll('.proto-filter-seg-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            btn.closest('.proto-filter-seg')
+               .querySelectorAll('.proto-filter-seg-btn')
+               .forEach(function (b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+          });
+        });
+
+        // Role quick-switcher — persist selection and recolor shell
+        document.querySelectorAll('.proto-role-item').forEach(function (item) {
+          item.addEventListener('click', function () {
+            var url = new URL(item.href, location.href);
+            var role = url.searchParams.get('role') || 'swe';
+            if (shell) { shell.setAttribute('data-target', role); }
+            localStorage.setItem('jm_target', role);
+          });
+        });
+
+        // Keyboard: Esc closes inspector
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') {
+            if (shell) { shell.classList.remove('inspector-open'); }
+          }
+        });
+
+        // Close inspector button
+        var closeBtn = document.querySelector('.proto-inspector-close');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', function () {
+            if (shell) { shell.classList.remove('inspector-open'); }
+          });
+        }
+
+        // Feed card click → open inspector and populate
+        document.querySelectorAll('.proto-card').forEach(function (card) {
+          card.addEventListener('click', function (e) {
+            if (e.target.closest('.proto-action-btn')) { return; }
+            document.querySelectorAll('.proto-card').forEach(function (c) {
+              c.classList.remove('selected');
+            });
+            card.classList.add('selected');
+            if (shell) { shell.classList.add('inspector-open'); }
+            // Populate inspector from data attrs
+            var title = card.querySelector('.proto-card-title');
+            var company = card.querySelector('.proto-meta-company');
+            var score = card.querySelector('.proto-score-badge');
+            var verdict = card.dataset.verdict;
+            var body = document.querySelector('[data-od-id="inspector-body"]');
+            if (!body) { return; }
+            var tierClass = score ? score.className.replace('proto-score-badge', '').trim() : 'tier-null';
+            body.innerHTML = '\
+<div class="proto-insp-score-row">\
+  <span class="proto-insp-score-big ' + tierClass + '">' + (score ? score.textContent.trim() : '&mdash;') + '</span>\
+  <div>\
+    <div class="proto-insp-company">' + (company ? company.textContent : '') + '</div>\
+    <div class="proto-insp-title">' + (title ? title.textContent : '') + '</div>\
+  </div>\
+</div>\
+' + (verdict ? '<div class="proto-insp-section"><div class="proto-insp-section-label">Verdict</div><div class="proto-insp-verdict"></div></div>' : '') + '\
+<div class="proto-insp-resume">\
+  <div class="proto-insp-section-label">Resume</div>\
+  <select class="proto-insp-resume-select"><option>SWE &mdash; backend v2</option><option>General base</option></select>\
+  <button type="button" class="proto-insp-apply-btn">Attach &amp; Apply &rarr;</button>\
+</div>';
+            if (verdict) {
+              var verdictEl = body.querySelector('.proto-insp-verdict');
+              if (verdictEl) { verdictEl.textContent = verdict; }
+            }
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>

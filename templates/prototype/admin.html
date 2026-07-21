@@ -1,0 +1,149 @@
+{% extends "prototype/_shell.html" %}
+
+{% block page_title %}Admin{% endblock page_title %}
+
+{% block main_content %}
+  <div class="proto-view-wrap" data-od-id="view-admin">
+    <div class="proto-view-heading">Administration</div>
+
+    {# KPIs #}
+    <div class="proto-section-card" data-od-id="admin-stats">
+      <div class="proto-section-title">Pipeline Stats</div>
+      <div class="proto-kpi-grid">
+        <div class="proto-kpi-box">
+          <div class="proto-kpi-value">{{ stats.kpis.ingested }}</div>
+          <div class="proto-kpi-label">Ingested</div>
+        </div>
+        <div class="proto-kpi-box">
+          <div class="proto-kpi-value">{{ stats.kpis.scored }}</div>
+          <div class="proto-kpi-label">Scored</div>
+        </div>
+        <div class="proto-kpi-box">
+          <div class="proto-kpi-value">{{ stats.kpis.high_match }}</div>
+          <div class="proto-kpi-label">High match</div>
+        </div>
+        <div class="proto-kpi-box">
+          <div class="proto-kpi-value">{{ stats.kpis.applied }}</div>
+          <div class="proto-kpi-label">Applied</div>
+        </div>
+        <div class="proto-kpi-box">
+          <div class="proto-kpi-value">{{ stats.kpis.apply_rate }}</div>
+          <div class="proto-kpi-label">Apply rate</div>
+        </div>
+        <div class="proto-kpi-box">
+          <div class="proto-kpi-value">{{ stats.kpis.avg_score }}</div>
+          <div class="proto-kpi-label">Avg score</div>
+        </div>
+      </div>
+    </div>
+
+    {# Per-target breakdown #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Per-Target Matches</div>
+      <table class="proto-admin-table">
+        <thead>
+          <tr>
+            <th>Target</th>
+            <th>Matched</th>
+            <th>Applied</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in stats.per_target %}
+            <tr>
+              <td>
+                <span style="display: inline-flex; align-items: center; gap: 6px">
+                  <span
+                    style="
+                      display: inline-block;
+                      width: 8px;
+                      height: 8px;
+                      border-radius: 50%;
+                      background: {{ row.color }};
+                      flex-shrink: 0
+                    "
+                  ></span>
+                  {{ row.role }}
+                </span>
+              </td>
+              <td>{{ row.matched }}</td>
+              <td>{{ row.applied }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Job Sources #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">Job Sources</div>
+      <table class="proto-admin-table">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Status</th>
+            <th>Volume</th>
+            <th>Dupes</th>
+            <th>Last run</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for src in stats.job_sources %}
+            <tr>
+              <td>{{ src.name }}</td>
+              <td>
+                <span class="proto-source-status {{ src.status }}">
+                  {{ src.status }}
+                </span>
+              </td>
+              <td>{{ src.volume }}</td>
+              <td>{{ src.dupes }}</td>
+              <td>
+                {% if src.last_run %}
+                  {{ src.last_run[:10] }}
+                {% else %}
+                  &mdash;
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# LLM & Models placeholder #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">LLM &amp; Models</div>
+      <div class="proto-field-group">
+        <div class="proto-field">
+          <span class="proto-label">Scoring model</span>
+          <span class="proto-value">claude-haiku-3-5 (anthropic)</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Extraction model</span>
+          <span class="proto-value">claude-haiku-3-5 (anthropic)</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Token budget</span>
+          <span class="proto-value">100 000 / run</span>
+        </div>
+      </div>
+    </div>
+
+    {# System placeholder #}
+    <div class="proto-section-card">
+      <div class="proto-section-title">System</div>
+      <div class="proto-field-group">
+        <div class="proto-field">
+          <span class="proto-label">Schedule</span>
+          <span class="proto-value">Disabled (manual trigger only)</span>
+        </div>
+        <div class="proto-field">
+          <span class="proto-label">Database</span>
+          <span class="proto-value">PostgreSQL 16 &mdash; 312 listings stored</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+{% endblock main_content %}

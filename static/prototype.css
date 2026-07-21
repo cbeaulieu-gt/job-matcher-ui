@@ -1,0 +1,1601 @@
+/* ============================================================
+   Shell-B prototype stylesheet — job-matcher redesign
+   Three-region CSS grid: rail (236px) · main (fluid) · inspector (0→360px)
+   Aesthetic: industrial terminal-ledger — same dark DNA as style.css.
+   All colours are CSS custom properties; no hard-coded hex values.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   Prototype design tokens — extends / supplements style.css
+   ------------------------------------------------------------ */
+:root {
+  /* Shell-B layout geometry */
+  --rail-width:       236px;
+  --inspector-width:  360px;
+  --ctx-height:       52px;
+  --subbar-height:    44px;
+
+  /* Per-target identity colours (Shell-B new) */
+  --target-swe:      #f5a623;
+  --target-data:     #4dd2f5;
+  --target-platform: #b58cf5;
+
+  /* Active target — JS recolors this via data-target attribute */
+  --target: var(--target-swe);
+
+  /* Rail-specific */
+  --rail-bg:         var(--bg-surface);
+  --rail-item-hover: var(--bg-raised);
+  --rail-active-bg:  var(--bg-raised);
+
+  /* Context bar */
+  --ctx-bg:          var(--bg-surface);
+  --ctx-border:      var(--border-subtle);
+
+  /* Inspector */
+  --inspector-bg:    var(--bg-surface);
+  --inspector-border: var(--border-subtle);
+
+  /* Subbar */
+  --subbar-bg:       var(--bg-base);
+  --subbar-border:   var(--border-subtle);
+
+  /* Tier flag bar on feed cards (4px left stripe) */
+  --flag-w: 4px;
+
+  /* Score-tier shorthand (used by feed card flags) */
+  --flag-high:  var(--score-high-text);
+  --flag-mid:   var(--score-mid-text);
+  --flag-low:   var(--score-low-text);
+  --flag-null:  var(--border-mid);
+
+  /* Salary delta */
+  --salary-up:   var(--score-high-text);
+  --salary-down: var(--score-low-text);
+  --salary-flat: var(--text-muted);
+}
+
+/* ------------------------------------------------------------
+   Target identity recoloring via data-target attribute
+   Sets --target so the whole shell shifts color on role switch.
+   ------------------------------------------------------------ */
+[data-target="swe"]      { --target: var(--target-swe); }
+[data-target="data"]     { --target: var(--target-data); }
+[data-target="platform"] { --target: var(--target-platform); }
+[data-target="combined"] { --target: var(--text-accent); }
+
+/* ------------------------------------------------------------
+   Shell reset — override the existing page-wrap layout
+   ------------------------------------------------------------ */
+.proto-body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------
+   Three-region shell grid  (data-od-id="shell")
+   ------------------------------------------------------------ */
+.proto-shell {
+  display: grid;
+  grid-template-columns: var(--rail-width) 1fr;
+  grid-template-rows: 100vh;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* When the inspector is open: three columns */
+.proto-shell.inspector-open {
+  grid-template-columns: var(--rail-width) 1fr var(--inspector-width);
+}
+
+/* ------------------------------------------------------------
+   Rail  (data-od-id="rail")
+   ------------------------------------------------------------ */
+.proto-rail {
+  grid-column: 1;
+  grid-row: 1;
+  background: var(--rail-bg);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100vh;
+}
+
+/* Rail header — logo mark */
+.proto-rail-header {
+  padding: 18px 16px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.proto-logo {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: normal;
+  color: var(--text-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  user-select: none;
+}
+
+.proto-logo .accent {
+  color: var(--target);
+  transition: color 300ms ease;
+}
+
+/* Section labels inside the rail */
+.proto-rail-label {
+  font-family: var(--font-mono);
+  font-size: 0.60rem;
+  font-weight: normal;
+  color: var(--text-muted);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  padding: 12px 16px 4px;
+  flex-shrink: 0;
+}
+
+/* Role quick-switcher block  (data-od-id="rail-roles") */
+.proto-rail-roles {
+  flex-shrink: 0;
+  padding: 4px 8px 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Single role row in the switcher */
+.proto-role-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.proto-role-item:hover {
+  background: var(--rail-item-hover);
+  color: var(--text-primary);
+}
+
+.proto-role-item.active {
+  background: var(--rail-active-bg);
+  color: var(--text-primary);
+}
+
+/* Target identity dot */
+.proto-role-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--role-color, var(--text-muted));
+}
+
+.proto-role-dot.paused {
+  opacity: 0.35;
+}
+
+/* Role name */
+.proto-role-name {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proto-role-item.paused .proto-role-name {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+/* Match count badge */
+.proto-role-count {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+/* Combined row */
+.proto-role-combined {
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 2px;
+}
+
+/* "Manage targets" link */
+.proto-role-manage {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  margin-top: 2px;
+}
+
+.proto-role-manage:hover {
+  color: var(--text-accent);
+  background: var(--rail-item-hover);
+}
+
+/* Config destination nav block */
+.proto-rail-nav {
+  flex: 1;
+  padding: 4px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.proto-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  letter-spacing: 0.04em;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.proto-nav-item:hover {
+  background: var(--rail-item-hover);
+  color: var(--text-primary);
+}
+
+.proto-nav-item.active {
+  background: var(--rail-active-bg);
+  color: var(--text-accent);
+}
+
+.proto-nav-icon {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.proto-nav-item.active .proto-nav-icon {
+  color: var(--target);
+  transition: color 300ms ease;
+}
+
+/* Admin nav item (separate group) */
+.proto-nav-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 6px 8px;
+}
+
+/* .me footer */
+.proto-rail-me {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.proto-me-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.proto-me-name {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proto-me-cog {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: color 120ms ease;
+}
+
+.proto-me-cog:hover {
+  color: var(--text-accent);
+}
+
+/* ------------------------------------------------------------
+   Main region  (data-od-id="main")
+   ------------------------------------------------------------ */
+.proto-main {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------
+   Context bar  (data-od-id="context")  — view-aware header
+   ------------------------------------------------------------ */
+.proto-ctx {
+  height: var(--ctx-height);
+  background: var(--ctx-bg);
+  border-bottom: 1px solid var(--ctx-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* Feed mode: target identity dot + name */
+.proto-ctx-target-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--target);
+  flex-shrink: 0;
+  transition: background-color 300ms ease;
+}
+
+.proto-ctx-target-name {
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* Criteria chips (feed mode only) */
+.proto-ctx-chips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  flex: 1;
+}
+
+.proto-ctx-chip {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Match count badge (feed mode) */
+.proto-ctx-match-count {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-accent);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Management mode: view title */
+.proto-ctx-view-icon {
+  font-size: 0.95rem;
+  color: var(--target);
+  transition: color 300ms ease;
+  flex-shrink: 0;
+}
+
+.proto-ctx-view-title {
+  font-family: var(--font-ui);
+  font-size: 0.90rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.proto-ctx-view-desc {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Separator between title and desc */
+.proto-ctx-sep {
+  color: var(--border-mid);
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+/* Live ingest indicator */
+.proto-ctx-ingest-indicator {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.proto-ingest-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--score-high-text);
+  animation: proto-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes proto-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.75); }
+}
+
+/* ------------------------------------------------------------
+   Subbar — feed-only filters  (data-od-id="filters")
+   ------------------------------------------------------------ */
+.proto-subbar {
+  height: var(--subbar-height);
+  background: var(--subbar-bg);
+  border-bottom: 1px solid var(--subbar-border);
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Completeness segment tabs: All · Full · Snippets */
+.proto-filter-seg {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.proto-filter-seg-btn {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.proto-filter-seg-btn:hover {
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+}
+
+.proto-filter-seg-btn.active {
+  background: var(--bg-raised);
+  color: var(--text-accent);
+  border-color: var(--border-mid);
+}
+
+/* Subbar search input */
+.proto-subbar-search {
+  flex: 1;
+  max-width: 260px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 5px 10px;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.proto-subbar-search::placeholder {
+  color: var(--text-muted);
+}
+
+.proto-subbar-search:focus {
+  border-color: var(--border-strong);
+}
+
+/* Spacer */
+.proto-subbar-spacer {
+  flex: 1;
+}
+
+/* Sort select */
+.proto-subbar-sort {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* ------------------------------------------------------------
+   Content area — scrollable feed / view body
+   ------------------------------------------------------------ */
+.proto-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ------------------------------------------------------------
+   Feed card list  (data-od-id="feed")
+   ------------------------------------------------------------ */
+.proto-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Feed card row */
+.proto-card {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+  position: relative;
+}
+
+.proto-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-mid);
+}
+
+.proto-card.selected {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+
+/* Tier flag — 4px left stripe */
+.proto-card-flag {
+  width: var(--flag-w);
+  flex-shrink: 0;
+  background: var(--flag-null);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.proto-card-flag.high { background: var(--flag-high); }
+.proto-card-flag.mid  { background: var(--flag-mid); }
+.proto-card-flag.low  { background: var(--flag-low); }
+
+/* Score badge (left of body) */
+.proto-card-score-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  flex-shrink: 0;
+  padding: 12px 0;
+}
+
+.proto-score-badge {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: normal;
+  letter-spacing: 0.02em;
+  padding: 3px 5px;
+  border-radius: var(--radius-sm);
+  min-width: 32px;
+  text-align: center;
+}
+
+.proto-score-badge.tier-high {
+  background: var(--score-high-bg);
+  color: var(--score-high-text);
+  border: 1px solid var(--score-high-border);
+}
+
+.proto-score-badge.tier-mid {
+  background: var(--score-mid-bg);
+  color: var(--score-mid-text);
+  border: 1px solid var(--score-mid-border);
+}
+
+.proto-score-badge.tier-low {
+  background: var(--score-low-bg);
+  color: var(--score-low-text);
+  border: 1px solid var(--score-low-border);
+}
+
+.proto-score-badge.tier-null {
+  background: var(--score-null-bg);
+  color: var(--score-null-text);
+  border: 1px solid var(--score-null-border);
+}
+
+/* Card body */
+.proto-card-body {
+  flex: 1;
+  padding: 10px 12px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Row 1: title */
+.proto-card-title {
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Row 2: meta — company · location · salary delta */
+.proto-card-meta {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.proto-meta-sep {
+  color: var(--border-mid);
+}
+
+/* Salary delta */
+.proto-salary-delta {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  font-weight: normal;
+}
+
+.proto-salary-delta.up   { color: var(--salary-up); }
+.proto-salary-delta.down { color: var(--salary-down); }
+.proto-salary-delta.flat { color: var(--salary-flat); }
+
+/* No-salary red flag */
+.proto-no-salary {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: var(--score-low-bg);
+  color: var(--score-low-text);
+  border: 1px solid var(--score-low-border);
+}
+
+/* Row 3: skill chips + badges */
+.proto-card-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.proto-chip {
+  font-family: var(--font-mono);
+  font-size: 0.60rem;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 20px;
+}
+
+.proto-chip.matched {
+  background: var(--chip-match-bg);
+  color: var(--chip-match-text);
+  border: 1px solid var(--chip-match-border);
+}
+
+.proto-chip.missing {
+  background: var(--chip-miss-bg);
+  color: var(--chip-miss-text);
+  border: 1px solid var(--chip-miss-border);
+}
+
+/* Remote / snippet / source / new badges */
+.proto-badge {
+  font-family: var(--font-mono);
+  font-size: 0.60rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 20px;
+  border: 1px solid;
+}
+
+.proto-badge.remote {
+  background: var(--score-high-bg);
+  color: var(--score-high-text);
+  border-color: var(--score-high-border);
+}
+
+.proto-badge.hybrid {
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  border-color: var(--border-mid);
+}
+
+.proto-badge.snippet {
+  background: var(--score-mid-bg);
+  color: var(--score-mid-text);
+  border-color: var(--score-mid-border);
+}
+
+.proto-badge.source {
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  border-style: dashed;
+}
+
+.proto-badge.new-badge {
+  background: transparent;
+  color: var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+/* Per-target role pills (Combined view only) */
+.proto-role-pill {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 20px;
+  background: transparent;
+  border: 1px solid;
+  color: var(--pill-color, var(--text-muted));
+  border-color: var(--pill-color, var(--border-subtle));
+}
+
+/* Card actions (right side) */
+.proto-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+.proto-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.proto-action-btn:hover {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.proto-action-btn.view { color: var(--text-accent); }
+.proto-action-btn.bookmarked { color: var(--star-filled); }
+.proto-action-btn.applied { color: var(--score-high-text); }
+
+/* Snippet awaiting-scrape state */
+.proto-card.snippet-state {
+  opacity: 0.75;
+  border-style: dashed;
+}
+
+.proto-card.snippet-state .proto-card-title {
+  color: var(--text-secondary);
+}
+
+/* ------------------------------------------------------------
+   Inspector  (data-od-id="inspector")
+   ------------------------------------------------------------ */
+.proto-inspector {
+  grid-column: 3;
+  grid-row: 1;
+  background: var(--inspector-bg);
+  border-left: 1px solid var(--inspector-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* When not open, the column width is 0 — hide content */
+.proto-shell:not(.inspector-open) .proto-inspector {
+  display: none;
+}
+
+.proto-inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.proto-inspector-title {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.proto-inspector-close {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: color 120ms ease;
+}
+
+.proto-inspector-close:hover {
+  color: var(--text-primary);
+}
+
+.proto-inspector-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Score breakdown in inspector */
+.proto-insp-score-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.proto-insp-score-big {
+  font-family: var(--font-mono);
+  font-size: 2rem;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.proto-insp-score-big.tier-high { color: var(--score-high-text); }
+.proto-insp-score-big.tier-mid  { color: var(--score-mid-text); }
+.proto-insp-score-big.tier-low  { color: var(--score-low-text); }
+
+.proto-insp-company {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.proto-insp-title {
+  font-family: var(--font-body);
+  font-size: 1.0rem;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.proto-insp-section {
+  margin-top: 16px;
+}
+
+.proto-insp-section-label {
+  font-family: var(--font-mono);
+  font-size: 0.60rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.proto-insp-verdict {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.proto-insp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Resume tie-in at the bottom */
+.proto-insp-resume {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.proto-insp-resume-select {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  outline: none;
+}
+
+.proto-insp-apply-btn {
+  display: block;
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--score-high-bg);
+  color: var(--score-high-text);
+  border: 1px solid var(--score-high-border);
+  border-radius: var(--radius-md);
+  padding: 7px 12px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 120ms ease;
+}
+
+.proto-insp-apply-btn:hover {
+  background: var(--bg-raised);
+}
+
+/* ------------------------------------------------------------
+   Management views — shared layout chrome
+   ------------------------------------------------------------ */
+.proto-view-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.proto-view-heading {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: normal;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Management section card */
+.proto-section-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+}
+
+.proto-section-title {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 14px;
+}
+
+/* Form field group */
+.proto-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.proto-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.proto-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.proto-value {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.proto-input {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+
+.proto-input:focus {
+  border-color: var(--border-strong);
+}
+
+/* ------------------------------------------------------------
+   Candidate Profile — skills section
+   ------------------------------------------------------------ */
+.proto-skill-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.proto-skill-chip {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  color: var(--text-secondary);
+}
+
+.proto-skill-chip .years {
+  color: var(--text-muted);
+  font-size: 0.62rem;
+}
+
+/* ------------------------------------------------------------
+   Roles editor — master–detail layout
+   ------------------------------------------------------------ */
+.proto-roles-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Role list (master) */
+.proto-roles-list {
+  border-right: 1px solid var(--border-subtle);
+  overflow-y: auto;
+  padding: 12px 0;
+}
+
+.proto-roles-list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.proto-roles-list-item:hover {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+}
+
+.proto-roles-list-item.active {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border-right: 2px solid var(--target);
+}
+
+.proto-roles-list-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.proto-roles-list-name {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  flex: 1;
+}
+
+.proto-roles-list-item.paused .proto-roles-list-name {
+  opacity: 0.5;
+  font-style: italic;
+}
+
+.proto-roles-list-count {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+}
+
+/* "+ New role" button */
+.proto-roles-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border-top: 1px solid var(--border-subtle);
+  margin-top: 4px;
+  transition: color 120ms ease;
+}
+
+.proto-roles-new:hover {
+  color: var(--text-accent);
+}
+
+/* Role detail (editor) */
+.proto-roles-detail {
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Tier band */
+.proto-tier-band {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.proto-tier-band-header {
+  padding: 10px 16px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.proto-tier-band-label {
+  font-family: var(--font-mono);
+  font-size: 0.60rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+.proto-tier-band-hint {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.proto-tier-band-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Override row (Tier 2 fields) */
+.proto-override-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.proto-override-inherited {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-style: italic;
+  flex: 1;
+  padding: 6px 10px;
+  background: var(--bg-base);
+  border: 1px dashed var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.proto-override-toggle-btn {
+  font-family: var(--font-mono);
+  font-size: 0.60rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 5px 9px;
+  border: 1px solid var(--border-mid);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+  flex-shrink: 0;
+}
+
+.proto-override-toggle-btn:hover {
+  color: var(--text-accent);
+  border-color: var(--text-accent);
+}
+
+/* Skills applicability chips */
+.proto-skills-applicable {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.proto-skill-toggle-chip {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 20px;
+  cursor: pointer;
+  border: 1px solid;
+  transition: background 120ms ease, color 120ms ease;
+  user-select: none;
+}
+
+.proto-skill-toggle-chip.on {
+  background: var(--bg-raised);
+  color: var(--text-accent);
+  border-color: var(--border-mid);
+}
+
+.proto-skill-toggle-chip.off {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+  opacity: 0.5;
+}
+
+/* ------------------------------------------------------------
+   Job Preferences view
+   ------------------------------------------------------------ */
+.proto-pref-location-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.proto-pref-location-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.proto-pref-location-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.proto-pref-location-remove {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: color 120ms ease;
+}
+
+.proto-pref-location-remove:hover {
+  color: var(--score-low-text);
+}
+
+.proto-multi-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.proto-multi-btn {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.proto-multi-btn.selected {
+  background: var(--bg-raised);
+  color: var(--text-accent);
+  border-color: var(--border-mid);
+}
+
+.proto-multi-btn.unselected {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: var(--border-subtle);
+}
+
+/* ------------------------------------------------------------
+   Admin stats
+   ------------------------------------------------------------ */
+.proto-kpi-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.proto-kpi-box {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.proto-kpi-value {
+  font-family: var(--font-mono);
+  font-size: 1.55rem;
+  color: var(--text-accent);
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+}
+
+.proto-kpi-label {
+  font-family: var(--font-mono);
+  font-size: 0.60rem;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* Admin table */
+.proto-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.proto-admin-table th {
+  font-size: 0.60rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-align: left;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.proto-admin-table td {
+  padding: 8px 12px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.proto-admin-table tr:last-child td {
+  border-bottom: none;
+}
+
+.proto-source-status {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 20px;
+  font-size: 0.60rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.proto-source-status.ok {
+  background: var(--score-high-bg);
+  color: var(--score-high-text);
+  border: 1px solid var(--score-high-border);
+}
+
+.proto-source-status.warn {
+  background: var(--score-mid-bg);
+  color: var(--score-mid-text);
+  border: 1px solid var(--score-mid-border);
+}
+
+.proto-source-status.off {
+  background: var(--bg-raised);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+/* ------------------------------------------------------------
+   Ingest FAB  (data-od-id="ingest-fab")
+   ------------------------------------------------------------ */
+.proto-ingest-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 50;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  border-radius: 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--btn-amber-border);
+  color: var(--text-accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.proto-ingest-fab:hover {
+  background: var(--btn-amber-hover-bg);
+  border-color: var(--btn-amber-hover-border);
+}
+
+/* ------------------------------------------------------------
+   Empty state (no jobs for role)
+   ------------------------------------------------------------ */
+.proto-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 12px;
+}
+
+.proto-empty-icon {
+  font-size: 2.4rem;
+  opacity: 0.25;
+}
+
+.proto-empty-title {
+  font-family: var(--font-ui);
+  font-size: 1.0rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.proto-empty-body {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.8;
+}
+
+/* ------------------------------------------------------------
+   Responsive — 980px breakpoint: rail collapses to icons
+   ------------------------------------------------------------ */
+@media (max-width: 980px) {
+  .proto-rail {
+    width: 52px;
+  }
+
+  .proto-shell {
+    grid-template-columns: 52px 1fr;
+  }
+
+  .proto-shell.inspector-open {
+    grid-template-columns: 52px 1fr var(--inspector-width);
+  }
+
+  .proto-rail-label,
+  .proto-role-name,
+  .proto-role-count,
+  .proto-role-manage,
+  .proto-nav-item span:not(.proto-nav-icon),
+  .proto-me-name,
+  .proto-me-cog,
+  .proto-logo span:not(.accent),
+  .proto-role-combined .proto-role-name {
+    display: none;
+  }
+
+  .proto-role-item,
+  .proto-nav-item {
+    justify-content: center;
+    padding: 8px;
+  }
+
+  .proto-nav-icon {
+    width: auto;
+  }
+
+  .proto-me-avatar {
+    margin: 0 auto;
+  }
+
+  .proto-rail-me {
+    justify-content: center;
+  }
+}
+
+/* ------------------------------------------------------------
+   Roles editor — responsive collapse at 860px
+   ------------------------------------------------------------ */
+@media (max-width: 860px) {
+  .proto-roles-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .proto-roles-list {
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+    max-height: 180px;
+  }
+}
